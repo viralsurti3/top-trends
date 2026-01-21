@@ -26,10 +26,60 @@ function sameCountries(a: string[], b: string[]) {
   return a.every((value, index) => value === b[index])
 }
 
+function buildDummyTrends(
+  countryCode: string,
+  sources: string[],
+  date: string | null,
+  realtimeWindow: number
+) {
+  const base = date
+    ? new Date(`${date}T12:00:00.000Z`)
+    : new Date()
+  const allSources = ['x', 'reddit', 'youtube', 'instagram']
+  const activeSources = sources.length > 0 ? sources : allSources
+  const trends: Trend[] = []
+
+  for (let hour = 0; hour < 12; hour += 1) {
+    for (const source of activeSources) {
+      for (let i = 0; i < 6; i += 1) {
+        const timestamp = new Date(base.getTime() - hour * 60 * 60 * 1000 - i * 1000)
+        trends.push({
+          name: `${source.toUpperCase()} Trend ${i + 1}`,
+          url: '#',
+          source,
+          volume: `${(i + 1) * 1.2}K`,
+          timestamp: timestamp.toISOString(),
+          country_code: countryCode,
+        })
+      }
+    }
+  }
+
+  if (!date && !Number.isNaN(realtimeWindow) && realtimeWindow > 0) {
+    const cutoff = Date.now() - realtimeWindow * 60 * 1000
+    return trends.filter((trend) => Date.parse(trend.timestamp) >= cutoff)
+  }
+
+  return trends
+}
+
 export async function GET(request: Request) {
-  await ensureSchema()
   const { searchParams } = new URL(request.url)
   const countryCode = searchParams.get('countryCode') || 'GLOBAL'
+  const date = searchParams.get('date')
+  const sources = normalizeSources(searchParams.get('source'))
+  const realtimeWindow = Number(process.env.REALTIME_WINDOW_MINUTES || 720)
+  const refresh = searchParams.get('refresh') === '1'
+  const useDummy =
+    process.env.USE_DUMMY_DATA === '1' ||
+    process.env.NEXT_PUBLIC_USE_DUMMY_DATA === '1'
+
+  if (useDummy) {
+    const trends = buildDummyTrends(countryCode, sources, date, realtimeWindow)
+    return NextResponse.json({ trends, failedSources: [] })
+  }
+
+  await ensureSchema()
   if (process.env.ENABLE_TREND_SCHEDULER !== '0') {
     const interval = Number(process.env.TREND_SCHEDULER_INTERVAL_MINUTES || 60)
     const raw = process.env.TREND_SCHEDULER_COUNTRIES || 'GLOBAL'
@@ -53,11 +103,6 @@ export async function GET(request: Request) {
       await startScheduler(interval, countries)
     }
   }
-  const date = searchParams.get('date')
-  const sources = normalizeSources(searchParams.get('source'))
-  const realtimeWindow = Number(process.env.REALTIME_WINDOW_MINUTES || 720)
-  const refresh = searchParams.get('refresh') === '1'
-
   const where: string[] = []
   const params: Array<string | number> = []
 

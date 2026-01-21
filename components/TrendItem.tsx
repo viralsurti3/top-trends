@@ -7,7 +7,7 @@ interface TrendItemProps {
   trend: {
     name: string
     url: string
-    source: 'reddit' | 'google' | 'hackernews' | 'bbc' | 'techcrunch' | 'youtube' | 'x' | 'instagram'
+    source: string
     volume?: string
     timestamp: string
   }

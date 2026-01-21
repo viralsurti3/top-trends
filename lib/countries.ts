@@ -4,7 +4,7 @@ export type Country = {
 }
 
 export const countries: Country[] = [
-  { name: 'Global', code: 'US' },
+  { name: 'Global', code: 'GLOBAL' },
   { name: 'United States', code: 'US' },
   { name: 'United Kingdom', code: 'GB' },
   { name: 'Canada', code: 'CA' },
@@ -49,5 +49,9 @@ export const countries: Country[] = [
 export function getCountryName(code: string): string {
   const match = countries.find((country) => country.code === code)
   return match?.name || 'United States'
+}
+
+export function getCountryCodes(): string[] {
+  return countries.map((country) => country.code)
 }
 

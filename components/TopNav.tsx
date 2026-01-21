@@ -94,12 +94,22 @@ export default function TopNav({
         {/* Desktop Country Selector */}
         <div className="hidden lg:flex items-center gap-2">
           <span className="text-[#666] text-sm">Country:</span>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#666] w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-3 py-1.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-[#ededed] text-sm placeholder-[#666] focus:outline-none focus:ring-2 focus:ring-[#3a3a3a] focus:border-transparent w-40"
+            />
+          </div>
           <select
             value={selectedCountryCode}
             onChange={(e) => onSelectCountryCode(e.target.value)}
             className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-1.5 text-[#ededed] text-sm focus:outline-none focus:ring-2 focus:ring-[#3a3a3a] focus:border-transparent cursor-pointer"
           >
-            {countries.map((country) => (
+            {filteredCountries.map((country) => (
               <option key={country.code} value={country.code}>
                 {country.name}
               </option>

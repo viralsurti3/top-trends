@@ -1,36 +1,61 @@
 'use client'
 
-import { MessageSquare, Globe, Youtube, TrendingUp } from 'lucide-react'
+import { MessageSquare, Globe, Flame, Newspaper, Rss, Youtube, Instagram, TrendingUp } from 'lucide-react'
 
 interface TrendItemProps {
+  rank: number
   trend: {
     name: string
     url: string
-    source: 'reddit' | 'google' | 'youtube'
+    source: 'reddit' | 'google' | 'hackernews' | 'bbc' | 'techcrunch' | 'youtube' | 'x' | 'instagram'
     volume?: string
     timestamp: string
   }
+  isHovered?: boolean
+  onHover?: () => void
+  onLeave?: () => void
 }
 
 const sourceIcons: Record<string, React.ReactNode> = {
   reddit: <MessageSquare className="w-4 h-4" />,
   google: <Globe className="w-4 h-4" />,
+  hackernews: <Flame className="w-4 h-4" />,
+  bbc: <Newspaper className="w-4 h-4" />,
+  techcrunch: <Rss className="w-4 h-4" />,
   youtube: <Youtube className="w-4 h-4" />,
+  x: <div className="font-bold text-[10px] border border-current rounded px-0.5 leading-none">X</div>,
+  instagram: <Instagram className="w-4 h-4" />,
 }
 
 const sourceColors: Record<string, string> = {
   reddit: 'text-[#ff4500]',
   google: 'text-[#34a853]',
+  hackernews: 'text-[#ff6600]',
+  bbc: 'text-[#bb1919]',
+  techcrunch: 'text-[#00a562]',
   youtube: 'text-[#ff0000]',
+  x: 'text-white',
+  instagram: 'text-[#e4405f]',
 }
 
 const sourceLabels: Record<string, string> = {
   reddit: 'Reddit',
   google: 'Google Trends',
+  hackernews: 'Hacker News',
+  bbc: 'BBC News',
+  techcrunch: 'TechCrunch',
   youtube: 'YouTube',
+  x: 'X / Twitter',
+  instagram: 'Instagram',
 }
 
-export default function TrendItem({ trend }: TrendItemProps) {
+export default function TrendItem({
+  trend,
+  rank,
+  isHovered,
+  onHover,
+  onLeave,
+}: TrendItemProps) {
   const icon = sourceIcons[trend.source] || <TrendingUp className="w-4 h-4" />
   const iconColor = sourceColors[trend.source] || 'text-[#666]'
   const sourceLabel = sourceLabels[trend.source] || trend.source
@@ -40,27 +65,28 @@ export default function TrendItem({ trend }: TrendItemProps) {
       href={trend.url}
       target="_blank"
       rel="noreferrer"
-      className="block bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-3 hover:bg-[#1f1f1f] hover:border-[#3a3a3a] transition-all cursor-pointer group"
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
+      className={`flex items-center gap-3 rounded-md px-3 py-2 transition-colors group ${
+        isHovered
+          ? 'bg-[#1a2233] border border-[#2c3f5c]'
+          : 'hover:bg-[#1a1a1a]'
+      }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <div className={`flex-shrink-0 ${iconColor}`}>
-              {icon}
-            </div>
-            <span className="text-xs text-[#666] font-medium">{sourceLabel}</span>
-          </div>
-          <h4 className="text-sm font-semibold text-[#ededed] mb-1 group-hover:text-white transition-colors">
-            {trend.name}
-          </h4>
-          {trend.volume ? (
-            <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#0f0f0f] border border-[#2a2a2a] px-2 py-0.5">
-              <TrendingUp className="w-3 h-3 text-[#666]" />
-              <span className="text-xs text-[#8a8a8a]">{trend.volume}</span>
-            </div>
-          ) : null}
+      <span className="w-5 text-xs text-[#666]">{rank}</span>
+      <div className={`flex-shrink-0 ${iconColor}`} title={sourceLabel}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm text-[#ededed] truncate group-hover:text-white transition-colors">
+          {trend.name}
         </div>
       </div>
+      {trend.volume ? (
+        <span className="text-xs text-[#8a8a8a] bg-[#0f0f0f] border border-[#2a2a2a] rounded-full px-2 py-0.5">
+          {trend.volume}
+        </span>
+      ) : null}
     </a>
   )
 }

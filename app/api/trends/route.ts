@@ -32,6 +32,10 @@ function buildDummyTrends(
   date: string | null,
   realtimeWindow: number
 ) {
+  const formatVolume = (value: number) => {
+    const rounded = value.toFixed(1)
+    return rounded.endsWith('.0') ? rounded.slice(0, -2) : rounded
+  }
   const base = date
     ? new Date(`${date}T12:00:00.000Z`)
     : new Date()
@@ -47,7 +51,7 @@ function buildDummyTrends(
           name: `${source.toUpperCase()} Trend ${i + 1}`,
           url: '#',
           source,
-          volume: `${(i + 1) * 1.2}K`,
+          volume: `${formatVolume((i + 1) * 1.2)}K`,
           timestamp: timestamp.toISOString(),
           country_code: countryCode,
         })

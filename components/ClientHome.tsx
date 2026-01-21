@@ -50,6 +50,15 @@ const platformIcons: Record<string, string> = {
   instagram: '◎',
 }
 
+function formatDisplayVolume(value?: string) {
+  if (!value) return null
+  const numeric = Number(value.replace(/[^\d.]/g, ''))
+  if (Number.isNaN(numeric)) return value
+  const hasSuffix = /[KMB]$/i.test(value.trim())
+  const formatted = numeric % 1 === 0 ? numeric.toString() : numeric.toFixed(1)
+  return hasSuffix ? `${formatted}K` : formatted
+}
+
 const languageCopy = {
   EN: {
     searchPlaceholder: 'Search trends...',
@@ -81,7 +90,7 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
   const router = useRouter()
   const searchParams = useSearchParams()
   const selectedCountryCode =
-    initialCountryCode || searchParams.get('country') || 'US'
+    initialCountryCode || searchParams.get('country') || 'GLOBAL'
   const selectedDate = initialDate ?? searchParams.get('date')
   const selectedCountryName = getCountryName(selectedCountryCode)
   const [searchQuery, setSearchQuery] = useState('')
@@ -323,11 +332,6 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
             {copy.failedToLoad}
           </div>
         )}
-        {failedSources.length > 0 && (
-          <div className="bg-[#fff7ed] border border-[#fed7aa] text-[#9a3412] rounded-lg px-4 py-2 text-sm">
-            {copy.sourcesUnavailable} {failedSources.join(', ')}
-          </div>
-        )}
 
         <div className="grid gap-6 md:grid-cols-2">
           <div className="bg-white border border-[#e5e7eb] rounded-2xl p-5 shadow-sm">
@@ -346,7 +350,11 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                     className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
                   >
                     <span className="font-medium">{trend.name}</span>
-                    {trend.volume && <span className="text-[#9ca3af]">{trend.volume}</span>}
+                    {trend.volume && (
+                      <span className="text-[#9ca3af]">
+                        {formatDisplayVolume(trend.volume)}
+                      </span>
+                    )}
                   </div>
                 ))
               )}
@@ -370,7 +378,11 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                     className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
                   >
                     <span className="font-medium">{trend.name}</span>
-                    {trend.volume && <span className="text-[#9ca3af]">{trend.volume}</span>}
+                    {trend.volume && (
+                      <span className="text-[#9ca3af]">
+                        {formatDisplayVolume(trend.volume)}
+                      </span>
+                    )}
                   </div>
                 ))
               )}
@@ -407,7 +419,11 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                         className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
                       >
                         <span className="font-medium">{trend.name}</span>
-                        {trend.volume && <span className="text-[#9ca3af]">{trend.volume}</span>}
+                        {trend.volume && (
+                          <span className="text-[#9ca3af]">
+                            {formatDisplayVolume(trend.volume)}
+                          </span>
+                        )}
                       </div>
                     ))
                   )}

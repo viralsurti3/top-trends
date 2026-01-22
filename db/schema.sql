@@ -12,3 +12,4 @@ CREATE TABLE IF NOT EXISTS trends (
   INDEX idx_trends_timestamp (timestamp)
 );
 
+

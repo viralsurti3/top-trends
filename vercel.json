@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/trends/fetch?countries=ALL", "schedule": "0 * * * *" }
+  ]
+}
+

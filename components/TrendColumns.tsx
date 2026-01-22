@@ -63,17 +63,11 @@ export default function TrendColumns({ countryCode, date, source }: TrendColumns
     setError(null)
     setFailedSources([])
 
-    const refreshSeconds = Number(
-      process.env.NEXT_PUBLIC_REALTIME_REFRESH_SECONDS || 60
-    )
-
     const load = () => {
       const params = new URLSearchParams()
       params.set('countryCode', countryCode)
       if (date) {
         params.set('date', date)
-      } else {
-        params.set('refresh', '1')
       }
       if (source && source !== 'all') {
         params.set('source', source)
@@ -108,10 +102,6 @@ export default function TrendColumns({ countryCode, date, source }: TrendColumns
     }
 
     load()
-
-    if (!date && !Number.isNaN(refreshSeconds) && refreshSeconds > 10) {
-      intervalId = setInterval(load, refreshSeconds * 1000)
-    }
 
     return () => {
       isActive = false

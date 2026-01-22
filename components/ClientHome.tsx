@@ -101,6 +101,8 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [failedSources, setFailedSources] = useState<string[]>([])
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshNonce, setRefreshNonce] = useState(0)
 
   const handleSelectCountry = (countryCode: string) => {
     router.push(buildTrendsPath(countryCode, selectedDate), { scroll: false })
@@ -109,6 +111,30 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
   const handleDateChange = (value: string) => {
     const date = value || null
     router.push(buildTrendsPath(selectedCountryCode, date), { scroll: false })
+  }
+
+  const handleRefresh = async () => {
+    if (selectedDate) return
+    setIsRefreshing(true)
+    setError(null)
+    try {
+      const countries =
+        selectedCountryCode === 'GLOBAL'
+          ? 'GLOBAL'
+          : `${selectedCountryCode},GLOBAL`
+      const params = new URLSearchParams({ countries })
+      const res = await fetch(`/api/trends/fetch?${params.toString()}`, {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        throw new Error('Failed to refresh trends')
+      }
+      setRefreshNonce((n) => n + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   useEffect(() => {
@@ -121,16 +147,12 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     params.set('countryCode', selectedCountryCode)
     if (selectedDate) {
       params.set('date', selectedDate)
-    } else {
-      params.set('refresh', '1')
     }
 
     const globalParams = new URLSearchParams()
     globalParams.set('countryCode', 'GLOBAL')
     if (selectedDate) {
       globalParams.set('date', selectedDate)
-    } else {
-      globalParams.set('refresh', '1')
     }
 
     Promise.all([
@@ -163,7 +185,7 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     return () => {
       isActive = false
     }
-  }, [selectedCountryCode, selectedDate])
+  }, [selectedCountryCode, selectedDate, refreshNonce])
 
   const rangeMinutes = useMemo(() => {
     if (timeRange === '48h') return 48 * 60
@@ -304,6 +326,14 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                 {range}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing || Boolean(selectedDate)}
+              className="px-3 py-1.5 rounded-lg text-sm border transition border-[#e5e7eb] text-[#6b7280] hover:border-[#c7d2fe] hover:text-[#374151] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRefreshing ? 'Refreshing...' : 'Refresh now'}
+            </button>
           </div>
         </div>
 

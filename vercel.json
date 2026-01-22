@@ -1,6 +1,0 @@
-{
-  "crons": [
-    { "path": "/api/trends/cron", "schedule": "0 * * * *" }
-  ]
-}
-

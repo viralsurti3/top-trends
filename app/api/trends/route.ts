@@ -26,6 +26,21 @@ function sameCountries(a: string[], b: string[]) {
   return a.every((value, index) => value === b[index])
 }
 
+function clamp(value: string, max: number) {
+  return value.length > max ? value.slice(0, max) : value
+}
+
+function sanitizeTrend(trend: Trend) {
+  return {
+    ...trend,
+    name: clamp(trend.name, 255),
+    url: clamp(trend.url, 2048),
+    source: clamp(trend.source, 32),
+    volume: trend.volume ? clamp(trend.volume, 32) : null,
+    country_code: clamp(trend.country_code, 10),
+  }
+}
+
 function buildDummyTrends(
   countryCode: string,
   sources: string[],
@@ -134,7 +149,7 @@ export async function GET(request: Request) {
 
   if (refresh) {
     const result = await fetchAllSources(countryCode)
-    const trends = result.trends
+    const trends = result.trends.map(sanitizeTrend)
     failedSources = result.failedSources
     if (trends.length > 0) {
       const values = trends

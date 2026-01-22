@@ -1,6 +1,28 @@
 import { fetchAllSources } from '@/lib/trend_fetchers'
 import { ensureSchema, query } from '@/lib/db'
 
+function clamp(value: string, max: number) {
+  return value.length > max ? value.slice(0, max) : value
+}
+
+function sanitizeTrend(trend: {
+  name: string
+  url: string
+  source: string
+  volume?: string
+  timestamp: string
+  country_code: string
+}) {
+  return {
+    ...trend,
+    name: clamp(trend.name, 255),
+    url: clamp(trend.url, 2048),
+    source: clamp(trend.source, 32),
+    volume: trend.volume ? clamp(trend.volume, 32) : null,
+    country_code: clamp(trend.country_code, 10),
+  }
+}
+
 type SchedulerState = {
   started: boolean
   intervalId?: NodeJS.Timeout
@@ -25,15 +47,16 @@ function getState(): SchedulerState {
 
 async function insertTrends(countryCode: string) {
   const { trends } = await fetchAllSources(countryCode)
-  if (trends.length === 0) return 0
+  const safeTrends = trends.map(sanitizeTrend)
+  if (safeTrends.length === 0) return 0
 
-  const values = trends
+  const values = safeTrends
     .map((_, index) => {
       const base = index * 6
       return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`
     })
     .join(', ')
-  const params = trends.flatMap((trend) => [
+  const params = safeTrends.flatMap((trend) => [
     trend.name,
     trend.url,
     trend.source,
@@ -59,7 +82,7 @@ async function insertTrends(countryCode: string) {
     params
   )
 
-  return trends.length
+  return safeTrends.length
 }
 
 export async function startScheduler(intervalMinutes: number, countries: string[]) {

@@ -1,6 +1,28 @@
 import { NextResponse } from 'next/server'
 import { ensureSchema, query } from '@/lib/db'
 
+function clamp(value: string, max: number) {
+  return value.length > max ? value.slice(0, max) : value
+}
+
+function sanitizeTrend(trend: {
+  name: string
+  url: string
+  source: string
+  volume?: string | null
+  timestamp: Date
+  country_code: string
+}) {
+  return {
+    ...trend,
+    name: clamp(trend.name, 255),
+    url: clamp(trend.url, 2048),
+    source: clamp(trend.source, 32),
+    volume: trend.volume ? clamp(trend.volume, 32) : null,
+    country_code: clamp(trend.country_code, 10),
+  }
+}
+
 export async function POST() {
   await ensureSchema()
 
@@ -48,13 +70,14 @@ export async function POST() {
     },
   ]
 
-  const values = rows
+  const safeRows = rows.map(sanitizeTrend)
+  const values = safeRows
     .map((_, index) => {
       const base = index * 6
       return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`
     })
     .join(', ')
-  const params = rows.flatMap((row) => [
+  const params = safeRows.flatMap((row) => [
     row.name,
     row.url,
     row.source,

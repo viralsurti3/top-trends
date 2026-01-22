@@ -1,4 +1,4 @@
-const isStaticExport = process.env.NEXT_OUTPUT === 'export'
+const isStaticExport = process.env.NEXT_OUTPUT === 'export' && !process.env.VERCEL
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

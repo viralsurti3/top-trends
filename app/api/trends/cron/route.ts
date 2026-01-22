@@ -3,6 +3,9 @@ import { ensureSchema, query } from '@/lib/db'
 import { fetchAllSources } from '@/lib/trend_fetchers'
 import { getCountryCodes } from '@/lib/countries'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 function clamp(value: string, max: number) {
   return value.length > max ? value.slice(0, max) : value
 }
@@ -25,61 +28,30 @@ function sanitizeTrend(trend: {
   }
 }
 
-function parseCountries(value: string | null): string[] {
-  if (!value) return ['GLOBAL']
-  if (value.trim().toUpperCase() === 'ALL') {
-    return getCountryCodes()
-  }
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-function clampDays(value: string | null): number {
-  const parsed = Number(value || 7)
-  if (Number.isNaN(parsed)) return 7
-  return Math.max(1, Math.min(parsed, 30))
-}
-
-export async function POST(request: Request) {
+export async function GET() {
   await ensureSchema()
-  const { searchParams } = new URL(request.url)
-  const countries = parseCountries(searchParams.get('countries'))
-  const days = clampDays(searchParams.get('days'))
+  const countries = getCountryCodes()
 
   const inserted: Record<string, number> = {}
   const failed: Record<string, string[]> = {}
 
   for (const countryCode of countries) {
     const { trends, failedSources } = await fetchAllSources(countryCode)
-    const safeTrends = trends.map(sanitizeTrend)
     failed[countryCode] = failedSources
 
-    if (safeTrends.length === 0) {
+    if (trends.length === 0) {
       inserted[countryCode] = 0
       continue
     }
 
-    const rows = []
-    for (let day = 0; day < days; day += 1) {
-      const shift = day * 24 * 60 * 60 * 1000
-      for (const trend of safeTrends) {
-        const timestamp = new Date(Date.now() - shift).toISOString()
-        rows.push({
-          ...trend,
-          timestamp,
-        })
-      }
-    }
-
-    const values = rows
+    const safeTrends = trends.map(sanitizeTrend)
+    const values = trends
       .map((_, index) => {
         const base = index * 6
         return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`
       })
       .join(', ')
-    const params = rows.flatMap((trend) => [
+    const params = safeTrends.flatMap((trend) => [
       trend.name,
       trend.url,
       trend.source,
@@ -96,9 +68,9 @@ export async function POST(request: Request) {
       params
     )
 
-    inserted[countryCode] = rows.length
+    inserted[countryCode] = trends.length
   }
 
-  return NextResponse.json({ ok: true, inserted, failed, days })
+  return NextResponse.json({ ok: true, inserted, failed })
 }
 

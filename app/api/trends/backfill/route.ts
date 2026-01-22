@@ -50,7 +50,12 @@ export async function POST(request: Request) {
       }
     }
 
-    const values = rows.map(() => '(?, ?, ?, ?, ?, ?)').join(', ')
+    const values = rows
+      .map((_, index) => {
+        const base = index * 6
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`
+      })
+      .join(', ')
     const params = rows.flatMap((trend) => [
       trend.name,
       trend.url,

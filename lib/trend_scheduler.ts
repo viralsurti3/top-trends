@@ -28,11 +28,11 @@ async function insertTrends(countryCode: string) {
   if (trends.length === 0) return 0
 
   const values = trends
-    .map(
-      () =>
-        'SELECT ? AS name, ? AS url, ? AS source, ? AS volume, ? AS timestamp, ? AS country_code'
-    )
-    .join(' UNION ALL ')
+    .map((_, index) => {
+      const base = index * 6
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`
+    })
+    .join(', ')
   const params = trends.flatMap((trend) => [
     trend.name,
     trend.url,
@@ -46,15 +46,14 @@ async function insertTrends(countryCode: string) {
     `
       INSERT INTO trends (name, url, source, volume, timestamp, country_code)
       SELECT v.name, v.url, v.source, v.volume, v.timestamp, v.country_code
-      FROM (${values}) v
+      FROM (VALUES ${values}) AS v(name, url, source, volume, timestamp, country_code)
       WHERE NOT EXISTS (
         SELECT 1
         FROM trends t
         WHERE t.name = v.name
           AND t.source = v.source
           AND t.country_code = v.country_code
-          AND DATE_FORMAT(t.timestamp, '%Y-%m-%d %H:00:00') =
-              DATE_FORMAT(v.timestamp, '%Y-%m-%d %H:00:00')
+          AND date_trunc('hour', t.timestamp) = date_trunc('hour', v.timestamp)
       )
     `,
     params

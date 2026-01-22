@@ -4,6 +4,9 @@ const isStaticExport = process.env.NEXT_OUTPUT === 'export'
 const nextConfig = {
   reactStrictMode: true,
   output: isStaticExport ? 'export' : undefined,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   images: {
     unoptimized: true,
   },

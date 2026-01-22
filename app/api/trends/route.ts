@@ -109,23 +109,25 @@ export async function GET(request: Request) {
   }
   const where: string[] = []
   const params: Array<string | number> = []
+  const addParam = (value: string | number) => {
+    params.push(value)
+    return `$${params.length}`
+  }
 
-  where.push('country_code = ?')
-  params.push(countryCode)
+  where.push(`country_code = ${addParam(countryCode)}`)
 
   if (date) {
-    where.push('DATE(timestamp) = ?')
-    params.push(date)
+    where.push(`DATE(timestamp) = ${addParam(date)}`)
   }
 
   if (sources.length > 0) {
-    where.push(`source IN (${sources.map(() => '?').join(', ')})`)
-    params.push(...sources)
+    const placeholders = sources.map((source) => addParam(source)).join(', ')
+    where.push(`source IN (${placeholders})`)
   }
 
   if (!date && !Number.isNaN(realtimeWindow) && realtimeWindow > 0) {
-    where.push('timestamp >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? MINUTE)')
-    params.push(realtimeWindow)
+    const minutesParam = addParam(realtimeWindow)
+    where.push(`timestamp >= (NOW() AT TIME ZONE 'UTC') - (${minutesParam} * INTERVAL '1 minute')`)
   }
 
   let failedSources: string[] = []
@@ -136,11 +138,11 @@ export async function GET(request: Request) {
     failedSources = result.failedSources
     if (trends.length > 0) {
       const values = trends
-        .map(
-          () =>
-            'SELECT ? AS name, ? AS url, ? AS source, ? AS volume, ? AS timestamp, ? AS country_code'
-        )
-        .join(' UNION ALL ')
+        .map((_, index) => {
+          const base = index * 6
+          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`
+        })
+        .join(', ')
       const insertParams = trends.flatMap((trend) => [
         trend.name,
         trend.url,
@@ -153,15 +155,14 @@ export async function GET(request: Request) {
         `
           INSERT INTO trends (name, url, source, volume, timestamp, country_code)
           SELECT v.name, v.url, v.source, v.volume, v.timestamp, v.country_code
-          FROM (${values}) v
+          FROM (VALUES ${values}) AS v(name, url, source, volume, timestamp, country_code)
           WHERE NOT EXISTS (
             SELECT 1
             FROM trends t
             WHERE t.name = v.name
               AND t.source = v.source
               AND t.country_code = v.country_code
-              AND DATE_FORMAT(t.timestamp, '%Y-%m-%d %H:00:00') =
-                  DATE_FORMAT(v.timestamp, '%Y-%m-%d %H:00:00')
+              AND date_trunc('hour', t.timestamp) = date_trunc('hour', v.timestamp)
           )
         `,
         insertParams
@@ -184,7 +185,7 @@ export async function GET(request: Request) {
             name,
             source,
             country_code,
-            DATE_FORMAT(timestamp, '%Y-%m-%d %H:00:00')
+            date_trunc('hour', timestamp)
           ORDER BY timestamp DESC
         ) AS rn
       FROM trends

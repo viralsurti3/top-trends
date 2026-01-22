@@ -31,7 +31,12 @@ export async function POST(request: Request) {
       continue
     }
 
-    const values = trends.map(() => '(?, ?, ?, ?, ?, ?)').join(', ')
+    const values = trends
+      .map((_, index) => {
+        const base = index * 6
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`
+      })
+      .join(', ')
     const params = trends.flatMap((trend) => [
       trend.name,
       trend.url,

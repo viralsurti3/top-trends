@@ -49,7 +49,10 @@ export async function POST() {
   ]
 
   const values = rows
-    .map(() => '(?, ?, ?, ?, ?, ?)')
+    .map((_, index) => {
+      const base = index * 6
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`
+    })
     .join(', ')
   const params = rows.flatMap((row) => [
     row.name,

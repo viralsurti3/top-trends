@@ -13,10 +13,24 @@ if (!DATABASE_URL && process.env.VERCEL) {
   throw new Error('DATABASE_URL is required on Vercel')
 }
 
+function normalizeDatabaseUrl(rawUrl: string) {
+  const projectId = process.env.SUPABASE_PROJECT_ID
+  if (!projectId) return rawUrl
+  try {
+    const parsed = new URL(rawUrl)
+    if (parsed.username && !parsed.username.endsWith(`.${projectId}`)) {
+      parsed.username = `${parsed.username}.${projectId}`
+    }
+    return parsed.toString()
+  } catch {
+    return rawUrl
+  }
+}
+
 const pool = new Pool(
   DATABASE_URL
     ? {
-        connectionString: DATABASE_URL,
+        connectionString: normalizeDatabaseUrl(DATABASE_URL),
         ssl: { rejectUnauthorized: false },
       }
     : {

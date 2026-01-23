@@ -13,7 +13,7 @@ const pool = new Pool(
   DATABASE_URL
     ? {
         connectionString: DATABASE_URL,
-        ssl: DATABASE_URL.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+        ssl: { rejectUnauthorized: false },
       }
     : {
         host: DB_HOST,

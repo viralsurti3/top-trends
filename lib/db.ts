@@ -9,6 +9,10 @@ const {
   DB_PASSWORD = '',
 } = process.env
 
+if (!DATABASE_URL && process.env.VERCEL) {
+  throw new Error('DATABASE_URL is required on Vercel')
+}
+
 const pool = new Pool(
   DATABASE_URL
     ? {

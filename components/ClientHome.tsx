@@ -103,6 +103,12 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
   const [failedSources, setFailedSources] = useState<string[]>([])
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshNonce, setRefreshNonce] = useState(0)
+  const [platformLimits, setPlatformLimits] = useState<Record<string, number>>({
+    x: 5,
+    reddit: 5,
+    youtube: 5,
+    instagram: 5,
+  })
 
   const handleSelectCountry = (countryCode: string) => {
     router.push(buildTrendsPath(countryCode, selectedDate), { scroll: false })
@@ -229,6 +235,14 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     })
     return bySource
   }, [filteredTrends])
+
+  const handleShowMore = (platformId: string) => {
+    const totalItems = (platformTrends[platformId] || []).length
+    setPlatformLimits((prev) => ({
+      ...prev,
+      [platformId]: Math.min((prev[platformId] || 5) + 5, totalItems),
+    }))
+  }
 
   const copy = languageCopy[language]
 
@@ -422,7 +436,9 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
 
         <div className="grid gap-6 lg:grid-cols-4">
           {platformCards.map((card) => {
-            const items = (platformTrends[card.id] || []).slice(0, 3)
+            const limit = platformLimits[card.id] || 5
+            const totalItems = (platformTrends[card.id] || []).length
+            const items = (platformTrends[card.id] || []).slice(0, limit)
             return (
               <div key={card.id} className="bg-white border border-[#e5e7eb] rounded-2xl overflow-hidden shadow-sm">
                 <div className={`px-4 py-3 text-white font-semibold bg-gradient-to-r ${card.accent}`}>
@@ -437,25 +453,42 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                     </span>
                   </div>
                 </div>
-                <div className="p-4 space-y-3 text-sm text-[#1f2937]">
+                <div className="p-4 text-sm text-[#1f2937] max-h-80 overflow-y-auto space-y-3 pr-2 light-scrollbar">
                   {isLoading ? (
                     <div className="text-[#9ca3af]">{copy.loading}</div>
                   ) : items.length === 0 ? (
                     <div className="text-[#9ca3af]">{copy.noTrends}</div>
                   ) : (
                     items.map((trend) => (
-                      <div
+                      <a
                         key={`${trend.source}-${trend.timestamp}-${trend.url}`}
-                        className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
+                        href={trend.url || '#'}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition group"
                       >
-                        <span className="font-medium">{trend.name}</span>
+                        <div className="min-w-0">
+                          <div className="font-medium truncate group-hover:text-[#111827]">{trend.name}</div>
+                          <div className="text-[11px] text-[#9ca3af] uppercase tracking-wide mt-0.5">
+                            {trend.source}
+                          </div>
+                        </div>
                         {trend.volume && (
                           <span className="text-[#9ca3af]">
                             {formatDisplayVolume(trend.volume)}
                           </span>
                         )}
-                      </div>
+                      </a>
                     ))
+                  )}
+                  {!isLoading && totalItems > limit && (
+                    <button
+                      type="button"
+                      onClick={() => handleShowMore(card.id)}
+                      className="w-full px-3 py-2 rounded-lg text-xs font-medium border border-[#e5e7eb] text-[#6b7280] hover:text-[#1f2937] hover:border-[#c7d2fe]"
+                    >
+                      Show more
+                    </button>
                   )}
                 </div>
               </div>

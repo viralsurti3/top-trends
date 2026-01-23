@@ -74,3 +74,7 @@ export async function GET() {
   return NextResponse.json({ ok: true, inserted, failed })
 }
 
+export async function POST() {
+  return GET()
+}
+

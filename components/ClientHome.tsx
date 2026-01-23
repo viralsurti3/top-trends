@@ -50,6 +50,12 @@ const platformIcons: Record<string, string> = {
   instagram: '◎',
 }
 
+function getRangeMinutes(range: '24h' | '48h' | '7d') {
+  if (range === '48h') return 48 * 60
+  if (range === '7d') return 7 * 24 * 60
+  return 24 * 60
+}
+
 function formatDisplayVolume(value?: string) {
   if (!value) return null
   const numeric = Number(value.replace(/[^\d.]/g, ''))
@@ -98,6 +104,7 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
   const [timeRange, setTimeRange] = useState<'24h' | '48h' | '7d'>('24h')
   const [trends, setTrends] = useState<Trend[]>([])
   const [globalTrends, setGlobalTrends] = useState<Trend[]>([])
+  const [hotCountryTrends, setHotCountryTrends] = useState<Trend[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [failedSources, setFailedSources] = useState<string[]>([])
@@ -143,37 +150,59 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     }
   }
 
+  const hotCountryCode = selectedCountryCode === 'GLOBAL' ? 'IT' : selectedCountryCode
+
   useEffect(() => {
     let isActive = true
     setIsLoading(true)
     setError(null)
     setFailedSources([])
+    const windowMinutes = getRangeMinutes(timeRange)
 
     const params = new URLSearchParams()
     params.set('countryCode', selectedCountryCode)
     if (selectedDate) {
       params.set('date', selectedDate)
+    } else {
+      params.set('windowMinutes', windowMinutes.toString())
     }
 
     const globalParams = new URLSearchParams()
     globalParams.set('countryCode', 'GLOBAL')
     if (selectedDate) {
       globalParams.set('date', selectedDate)
+    } else {
+      globalParams.set('windowMinutes', windowMinutes.toString())
     }
 
-    Promise.all([
+    const requests = [
       fetch(`/api/trends?${params.toString()}`),
       fetch(`/api/trends?${globalParams.toString()}`),
-    ])
-      .then(async ([countryRes, globalRes]) => {
-        if (!countryRes.ok || !globalRes.ok) {
+    ]
+    if (hotCountryCode !== selectedCountryCode) {
+      const hotParams = new URLSearchParams()
+      hotParams.set('countryCode', hotCountryCode)
+      if (selectedDate) {
+        hotParams.set('date', selectedDate)
+      } else {
+        hotParams.set('windowMinutes', windowMinutes.toString())
+      }
+      requests.push(fetch(`/api/trends?${hotParams.toString()}`))
+    }
+
+    Promise.all(requests)
+      .then(async (responses) => {
+        const [countryRes, globalRes, hotRes] = responses
+        if (!countryRes.ok || !globalRes.ok || (hotRes && !hotRes.ok)) {
           throw new Error('Failed to load trends')
         }
         const countryData = (await countryRes.json()) as TrendsResponse
         const globalData = (await globalRes.json()) as TrendsResponse
+        const hotData = hotRes ? ((await hotRes.json()) as TrendsResponse) : null
         if (!isActive) return
         setTrends(countryData.trends || [])
         setGlobalTrends(globalData.trends || [])
+        setHotCountryTrends(hotData ? hotData.trends || [] : countryData.trends || [])
         setFailedSources(countryData.failedSources || [])
       })
       .catch((err) => {
@@ -181,6 +210,7 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
         setError(err instanceof Error ? err.message : 'Unknown error')
         setTrends([])
         setGlobalTrends([])
+        setHotCountryTrends([])
         setFailedSources([])
       })
       .finally(() => {
@@ -191,13 +221,9 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     return () => {
       isActive = false
     }
-  }, [selectedCountryCode, selectedDate, refreshNonce])
+  }, [selectedCountryCode, selectedDate, refreshNonce, timeRange, hotCountryCode])
 
-  const rangeMinutes = useMemo(() => {
-    if (timeRange === '48h') return 48 * 60
-    if (timeRange === '7d') return 7 * 24 * 60
-    return 24 * 60
-  }, [timeRange])
+  const rangeMinutes = useMemo(() => getRangeMinutes(timeRange), [timeRange])
 
   const filteredTrends = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -222,7 +248,31 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
   }, [globalTrends, searchQuery, rangeMinutes])
 
   const hotGlobal = filteredGlobalTrends.slice(0, 3)
-  const hotLocal = filteredTrends.slice(0, 3)
+  const hotLocal = hotCountryTrends.slice(0, 3)
+
+  const mixedHotGlobal = useMemo(() => {
+    const sourceOrder = ['reddit', 'instagram', 'x', 'youtube']
+    const buckets = new Map<string, Trend[]>()
+    sourceOrder.forEach((source) => {
+      buckets.set(
+        source,
+        filteredGlobalTrends.filter((trend) => trend.source === source)
+      )
+    })
+    const mixed: Trend[] = []
+    let round = 0
+    while (mixed.length < 3 && round < 10) {
+      sourceOrder.forEach((source) => {
+        if (mixed.length >= 3) return
+        const list = buckets.get(source)
+        if (list && list.length > round) {
+          mixed.push(list[round])
+        }
+      })
+      round += 1
+    }
+    return mixed.length > 0 ? mixed : hotGlobal
+  }, [filteredGlobalTrends, hotGlobal])
 
   const platformTrends = useMemo(() => {
     const bySource: Record<string, Trend[]> = {}
@@ -250,13 +300,13 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     <div className="min-h-screen bg-[#f4f6fb] text-[#1f2937]">
       <div className="absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-[#eef2ff] via-[#f8fafc] to-transparent pointer-events-none" />
       <header className="relative bg-white/80 backdrop-blur border-b border-[#e5e7eb]">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-6">
+        <div className="max-w-[80%] mx-auto px-6 py-4 flex items-center gap-6">
           <div className="flex items-center gap-2 font-bold text-xl text-[#111827]">
             <span className="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center">b</span>
             buzzify.org
           </div>
-          <div className="flex-1">
-            <div className="relative">
+          <div className="flex-1 flex items-center gap-6">
+            <div className="relative flex-1">
               <input
                 type="text"
                 placeholder={copy.searchPlaceholder}
@@ -265,9 +315,42 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                 className="w-full border border-[#e5e7eb] rounded-full px-5 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#6366f1] focus:border-[#c7d2fe]"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af]">
-                🔍
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-4 h-4"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
               </span>
             </div>
+            <nav className="hidden md:flex items-center gap-4 text-sm text-[#6b7280]">
+              <a
+                href="#"
+                className="px-2 py-1 rounded-full hover:text-[#111827] hover:bg-[#f3f4f6] transition"
+              >
+                YouTube Trends
+              </a>
+              <span className="h-4 w-px bg-[#e5e7eb]" />
+              <a
+                href="#"
+                className="px-2 py-1 rounded-full hover:text-[#111827] hover:bg-[#f3f4f6] transition"
+              >
+                Contact
+              </a>
+              <a
+                href="#"
+                className="px-2 py-1 rounded-full hover:text-[#111827] hover:bg-[#f3f4f6] transition"
+              >
+                About
+              </a>
+            </nav>
           </div>
           <div className="flex items-center gap-3 text-sm text-[#6b7280]">
             <div className="flex items-center gap-1 rounded-full border border-[#e5e7eb] bg-white p-1">
@@ -299,7 +382,7 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
         </div>
       </header>
 
-      <main className="relative max-w-6xl mx-auto px-6 py-6 space-y-6">
+      <main className="relative max-w-[80%] mx-auto px-6 py-6 space-y-6 overflow-x-hidden">
         <div className="flex flex-wrap items-center gap-4 bg-white/90 border border-[#e5e7eb] rounded-2xl px-4 py-3 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="text-sm text-[#6b7280]">{copy.selectCountry}</span>
@@ -351,26 +434,6 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="bg-white border border-[#e5e7eb] rounded-2xl px-5 py-4 shadow-sm">
-            <div className="text-xs uppercase tracking-wide text-[#9ca3af]">Total trends</div>
-            <div className="text-2xl font-semibold mt-1">{filteredTrends.length}</div>
-            <div className="text-xs text-[#9ca3af] mt-2">Filtered by search & range</div>
-          </div>
-          <div className="bg-white border border-[#e5e7eb] rounded-2xl px-5 py-4 shadow-sm">
-            <div className="text-xs uppercase tracking-wide text-[#9ca3af]">Active platforms</div>
-            <div className="text-2xl font-semibold mt-1">
-              {Object.keys(platformTrends).length}
-            </div>
-            <div className="text-xs text-[#9ca3af] mt-2">X, Reddit, YouTube, Instagram</div>
-          </div>
-          <div className="bg-white border border-[#e5e7eb] rounded-2xl px-5 py-4 shadow-sm">
-            <div className="text-xs uppercase tracking-wide text-[#9ca3af]">Country</div>
-            <div className="text-2xl font-semibold mt-1">{selectedCountryName}</div>
-            <div className="text-xs text-[#9ca3af] mt-2">{timeRange.toUpperCase()} window</div>
-          </div>
-        </div>
-
         {error && (
           <div className="bg-[#fee2e2] border border-[#fecaca] text-[#991b1b] rounded-lg px-4 py-2 text-sm">
             {copy.failedToLoad}
@@ -385,21 +448,24 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
             <div className="space-y-3 text-sm text-[#1f2937]">
               {isLoading ? (
                 <div className="text-[#9ca3af]">{copy.loading}</div>
-              ) : hotGlobal.length === 0 ? (
+              ) : mixedHotGlobal.length === 0 ? (
                 <div className="text-[#9ca3af]">{copy.noTrends}</div>
               ) : (
-                hotGlobal.map((trend) => (
-                  <div
+                mixedHotGlobal.map((trend) => (
+                  <a
                     key={`${trend.source}-${trend.timestamp}-${trend.url}`}
+                    href={trend.url || '#'}
+                    target="_blank"
+                    rel="noreferrer"
                     className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
                   >
                     <span className="font-medium">{trend.name}</span>
-                    {trend.volume && (
-                      <span className="text-[#9ca3af]">
+                    {false && trend.volume && (
+                      <span className="text-[11px] font-semibold text-[#1f2937] bg-[#eef2ff] border border-[#c7d2fe] rounded-full px-2 py-0.5">
                         {formatDisplayVolume(trend.volume)}
                       </span>
                     )}
-                  </div>
+                  </a>
                 ))
               )}
             </div>
@@ -407,7 +473,7 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
 
           <div className="bg-white border border-[#e5e7eb] rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-2 text-lg font-semibold mb-3">
-              {copy.hotTopicsIn} {selectedCountryName}
+              {copy.hotTopicsIn} {hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
               <span className="text-[#22c55e]">🏁</span>
             </div>
             <div className="space-y-3 text-sm text-[#1f2937]">
@@ -417,30 +483,33 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                 <div className="text-[#9ca3af]">{copy.noTrends}</div>
               ) : (
                 hotLocal.map((trend) => (
-                  <div
+                  <a
                     key={`${trend.source}-${trend.timestamp}-${trend.url}`}
+                    href={trend.url || '#'}
+                    target="_blank"
+                    rel="noreferrer"
                     className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
                   >
                     <span className="font-medium">{trend.name}</span>
-                    {trend.volume && (
-                      <span className="text-[#9ca3af]">
+                    {false && trend.volume && (
+                      <span className="text-[11px] font-semibold text-[#1f2937] bg-[#eef2ff] border border-[#c7d2fe] rounded-full px-2 py-0.5">
                         {formatDisplayVolume(trend.volume)}
                       </span>
                     )}
-                  </div>
+                  </a>
                 ))
               )}
             </div>
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-4">
+        <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
           {platformCards.map((card) => {
             const limit = platformLimits[card.id] || 5
             const totalItems = (platformTrends[card.id] || []).length
             const items = (platformTrends[card.id] || []).slice(0, limit)
             return (
-              <div key={card.id} className="bg-white border border-[#e5e7eb] rounded-2xl overflow-hidden shadow-sm">
+              <div key={card.id} className="bg-white border border-[#e5e7eb] rounded-2xl overflow-hidden shadow-sm flex flex-col">
                 <div className={`px-4 py-3 text-white font-semibold bg-gradient-to-r ${card.accent}`}>
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">
@@ -453,7 +522,7 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                     </span>
                   </div>
                 </div>
-                <div className="p-4 text-sm text-[#1f2937] max-h-80 overflow-y-auto space-y-3 pr-2 light-scrollbar">
+                <div className="p-4 text-sm text-[#1f2937] max-h-80 overflow-y-auto space-y-3 pr-2 light-scrollbar flex-1">
                   {isLoading ? (
                     <div className="text-[#9ca3af]">{copy.loading}</div>
                   ) : items.length === 0 ? (
@@ -468,20 +537,19 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                         className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition group"
                       >
                         <div className="min-w-0">
-                          <div className="font-medium truncate group-hover:text-[#111827]">{trend.name}</div>
-                          <div className="text-[11px] text-[#9ca3af] uppercase tracking-wide mt-0.5">
-                            {trend.source}
-                          </div>
+                          <div className="font-medium line-clamp-3 group-hover:text-[#111827]">{trend.name}</div>
                         </div>
-                        {trend.volume && (
-                          <span className="text-[#9ca3af]">
+                        {false && trend.volume && (
+                          <span className="text-[11px] font-semibold text-[#1f2937] bg-[#eef2ff] border border-[#c7d2fe] rounded-full px-2 py-0.5">
                             {formatDisplayVolume(trend.volume)}
                           </span>
                         )}
                       </a>
                     ))
                   )}
-                  {!isLoading && totalItems > limit && (
+                </div>
+                {!isLoading && totalItems > limit && (
+                  <div className="border-t border-[#eef2f7] px-4 py-3 bg-white">
                     <button
                       type="button"
                       onClick={() => handleShowMore(card.id)}
@@ -489,8 +557,8 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                     >
                       Show more
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )
           })}

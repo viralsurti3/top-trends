@@ -87,7 +87,10 @@ export async function GET(request: Request) {
   const countryCode = searchParams.get('countryCode') || 'GLOBAL'
   const date = searchParams.get('date')
   const sources = normalizeSources(searchParams.get('source'))
-  const realtimeWindow = Number(process.env.REALTIME_WINDOW_MINUTES || 720)
+  const requestedWindow = Number(searchParams.get('windowMinutes'))
+  const realtimeWindow = !Number.isNaN(requestedWindow) && requestedWindow > 0
+    ? requestedWindow
+    : Number(process.env.REALTIME_WINDOW_MINUTES || 720)
   const refresh = searchParams.get('refresh') === '1'
   const useDummy =
     process.env.USE_DUMMY_DATA === '1' ||

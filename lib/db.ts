@@ -69,6 +69,21 @@ export async function ensureSchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_trends_timestamp ON trends (timestamp)`)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS youtube_trends_snapshots (
+      id BIGSERIAL PRIMARY KEY,
+      region_code VARCHAR(10) NOT NULL,
+      payload JSONB NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `)
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_youtube_trends_region ON youtube_trends_snapshots (region_code)`
+  )
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_youtube_trends_created ON youtube_trends_snapshots (created_at)`
+  )
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS cms_pages (
       slug VARCHAR(64) PRIMARY KEY,
       title VARCHAR(255) NOT NULL,

@@ -12,4 +12,13 @@ CREATE TABLE IF NOT EXISTS trends (
   INDEX idx_trends_timestamp (timestamp)
 );
 
+CREATE TABLE IF NOT EXISTS youtube_trends_snapshots (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  region_code VARCHAR(10) NOT NULL,
+  payload JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_youtube_trends_region (region_code),
+  INDEX idx_youtube_trends_created (created_at)
+);
+
 

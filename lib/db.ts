@@ -68,6 +68,15 @@ export async function ensureSchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_trends_source ON trends (source)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_trends_timestamp ON trends (timestamp)`)
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cms_pages (
+      slug VARCHAR(64) PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      content JSONB NOT NULL,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `)
+
   schemaReady = true
 }
 

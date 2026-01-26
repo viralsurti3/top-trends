@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { countries, getCountryName } from '@/lib/countries'
+import SiteHeader from '@/components/SiteHeader'
 
 type ClientHomeProps = {
   initialCountryCode?: string
@@ -71,6 +72,8 @@ const languageCopy = {
     selectCountry: 'Select Country',
     date: 'Date',
     timeRange: 'Time Range:',
+    refreshNow: 'Refresh now',
+    refreshing: 'Refreshing...',
     failedToLoad: 'Failed to load trends.',
     sourcesUnavailable: 'Sources unavailable:',
     hotTopicsGlobal: 'Hot Topics Global',
@@ -83,6 +86,8 @@ const languageCopy = {
     selectCountry: 'Seleziona paese',
     date: 'Data',
     timeRange: 'Intervallo:',
+    refreshNow: 'Aggiorna ora',
+    refreshing: 'Aggiornamento...',
     failedToLoad: 'Impossibile caricare i trend.',
     sourcesUnavailable: 'Fonti non disponibili:',
     hotTopicsGlobal: 'Argomenti caldi globali',
@@ -299,88 +304,12 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
   return (
     <div className="min-h-screen bg-[#f4f6fb] text-[#1f2937]">
       <div className="absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-[#eef2ff] via-[#f8fafc] to-transparent pointer-events-none" />
-      <header className="relative bg-white/80 backdrop-blur border-b border-[#e5e7eb]">
-        <div className="max-w-[80%] mx-auto px-6 py-4 flex items-center gap-6">
-          <div className="flex items-center gap-2 font-bold text-xl text-[#111827]">
-            <span className="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center">b</span>
-            buzzify.org
-          </div>
-          <div className="flex-1 flex items-center gap-6">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder={copy.searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full border border-[#e5e7eb] rounded-full px-5 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#6366f1] focus:border-[#c7d2fe]"
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af]">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="w-4 h-4"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </span>
-            </div>
-            <nav className="hidden md:flex items-center gap-4 text-sm text-[#6b7280]">
-              <a
-                href="#"
-                className="px-2 py-1 rounded-full hover:text-[#111827] hover:bg-[#f3f4f6] transition"
-              >
-                YouTube Trends
-              </a>
-              <span className="h-4 w-px bg-[#e5e7eb]" />
-              <a
-                href="#"
-                className="px-2 py-1 rounded-full hover:text-[#111827] hover:bg-[#f3f4f6] transition"
-              >
-                Contact
-              </a>
-              <a
-                href="#"
-                className="px-2 py-1 rounded-full hover:text-[#111827] hover:bg-[#f3f4f6] transition"
-              >
-                About
-              </a>
-            </nav>
-          </div>
-          <div className="flex items-center gap-3 text-sm text-[#6b7280]">
-            <div className="flex items-center gap-1 rounded-full border border-[#e5e7eb] bg-white p-1">
-              <button
-                type="button"
-                onClick={() => setLanguage('EN')}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition ${
-                  language === 'EN'
-                    ? 'bg-[#111827] text-white'
-                    : 'text-[#6b7280] hover:text-[#111827]'
-                }`}
-              >
-                EN
-              </button>
-              <button
-                type="button"
-                onClick={() => setLanguage('IT')}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition ${
-                  language === 'IT'
-                    ? 'bg-[#111827] text-white'
-                    : 'text-[#6b7280] hover:text-[#111827]'
-                }`}
-              >
-                IT
-              </button>
-            </div>
-            <span className="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center">👤</span>
-          </div>
-        </div>
-      </header>
+      <SiteHeader
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        language={language}
+        onLanguageChange={setLanguage}
+      />
 
       <main className="relative max-w-[80%] mx-auto px-6 py-6 space-y-6 overflow-x-hidden">
         <div className="flex flex-wrap items-center gap-4 bg-white/90 border border-[#e5e7eb] rounded-2xl px-4 py-3 shadow-sm">
@@ -429,7 +358,7 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
               disabled={isRefreshing || Boolean(selectedDate)}
               className="px-3 py-1.5 rounded-lg text-sm border transition border-[#e5e7eb] text-[#6b7280] hover:border-[#c7d2fe] hover:text-[#374151] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isRefreshing ? 'Refreshing...' : 'Refresh now'}
+              {isRefreshing ? copy.refreshing : copy.refreshNow}
             </button>
           </div>
         </div>

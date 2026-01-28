@@ -60,6 +60,7 @@ const languageCopy = {
     noCategories: 'No trending videos available right now.',
     region: 'Region',
     source: 'Source:',
+    updated: 'Updated',
   },
   IT: {
     title: 'Trend YouTube',
@@ -77,12 +78,33 @@ const languageCopy = {
     noCategories: 'Nessun video in tendenza disponibile al momento.',
     region: 'Paese',
     source: 'Fonte:',
+    updated: 'Aggiornato',
   },
 } as const
 
 function matchesQuery(value: string, query: string) {
   if (!query) return true
   return value.toLowerCase().includes(query)
+}
+
+function formatRelativeTime(value: number | null, language: 'EN' | 'IT') {
+  if (!value || Number.isNaN(value)) {
+    return language === 'IT' ? 'N/D' : 'N/A'
+  }
+  const diffMs = Date.now() - value
+  const minutes = Math.max(Math.floor(diffMs / 60000), 0)
+  if (minutes < 5) return language === 'IT' ? 'pochi minuti fa' : 'a few mins ago'
+  if (minutes < 30) return language === 'IT' ? "mezz'ora fa" : 'half an hour ago'
+  if (minutes < 60) return language === 'IT' ? '1 ora fa' : '1 hour ago'
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24)
+    return language === 'IT' ? `${hours} ore fa` : `${hours} hours ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7)
+    return language === 'IT' ? `${days} giorni fa` : `${days} days ago`
+  const weeks = Math.floor(days / 7)
+  if (weeks <= 1) return language === 'IT' ? '1 settimana fa' : '1 week ago'
+  return language === 'IT' ? `${weeks} settimane fa` : `${weeks} weeks ago`
 }
 
 export default function YouTubeTrendsClient() {
@@ -136,6 +158,10 @@ export default function YouTubeTrendsClient() {
 
   const query = searchQuery.trim().toLowerCase()
   const copy = languageCopy[language]
+  const updatedRelative = useMemo(() => {
+    const timestamp = data?.source?.fetchedAt ? Date.parse(data.source.fetchedAt) : null
+    return formatRelativeTime(timestamp, language)
+  }, [data?.source?.fetchedAt, language])
 
   const filteredKeywords = useMemo(() => {
     if (!data) return []
@@ -178,18 +204,35 @@ export default function YouTubeTrendsClient() {
   const handleLoadTrends = async () => {
     setIsLoading(true)
     setError(null)
-    const params = new URLSearchParams()
-    if (region) {
-      params.set('region', region)
-    }
-    params.set('refresh', '1')
     try {
-      const res = await fetch(`/api/youtube-trends?${params.toString()}`)
-      if (!res.ok) {
-        throw new Error('Request failed')
+      const fetchRefresh = async (regionCode: string) => {
+        const params = new URLSearchParams()
+        if (regionCode) {
+          params.set('region', regionCode)
+        }
+        params.set('refresh', '1')
+        const res = await fetch(`/api/youtube-trends?${params.toString()}`)
+        if (!res.ok) {
+          throw new Error('Request failed')
+        }
+        return (await res.json()) as YoutubeTrendPayload
       }
-      const payload = (await res.json()) as YoutubeTrendPayload
+
+      const payload = await fetchRefresh(region)
       setData(payload)
+
+      if (region === 'GLOBAL') {
+        void (async () => {
+          for (const country of countries) {
+            if (country.code === 'GLOBAL') continue
+            try {
+              await fetchRefresh(country.code)
+            } catch {
+              // best-effort background refresh
+            }
+          }
+        })()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
       setData(null)
@@ -235,6 +278,9 @@ export default function YouTubeTrendsClient() {
             >
               {isLoading ? copy.loadingButton : copy.load}
             </button>
+            <span className="text-xs text-[#9ca3af] w-full">
+              {copy.updated} {updatedRelative}
+            </span>
           </div>
         </div>
 

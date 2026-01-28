@@ -7,6 +7,8 @@ type Trend = {
   country_code: string
 }
 
+import { countries } from '@/lib/countries'
+
 const subredditByCountry: Record<string, string> = {
   US: 'news',
   GB: 'unitedkingdom',
@@ -48,10 +50,18 @@ const subredditByCountry: Record<string, string> = {
   EG: 'egypt',
 }
 
-function getSubreddit(countryCode: string): string {
+function normalizeSubreddit(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function getSubredditCandidates(countryCode: string): string[] {
   const code = countryCode.toUpperCase()
-  if (code === 'GLOBAL') return 'worldnews'
-  return subredditByCountry[code] || 'worldnews'
+  if (code === 'GLOBAL') return ['worldnews']
+  const country = countries.find((item) => item.code === code)
+  const mapped = subredditByCountry[code]
+  const normalized = country ? normalizeSubreddit(country.name) : null
+  const candidates = [mapped, normalized, code.toLowerCase(), 'worldnews']
+  return Array.from(new Set(candidates.filter(Boolean))) as string[]
 }
 
 function decodeHtml(value: string): string {
@@ -107,49 +117,55 @@ function jina(url: string): string {
 }
 
 export async function fetchRedditTrends(countryCode: string): Promise<Trend[]> {
-  const subreddit = getSubreddit(countryCode)
   const limit = 50
-  const url = `https://www.reddit.com/r/${subreddit}/top.json?limit=${limit}&t=day&raw_json=1`
-  try {
-    const text = await fetchText(url)
-    const data = JSON.parse(text) as {
-      data?: {
-        children?: Array<{
-          data?: {
-            title?: string
-            score?: number
-            permalink?: string
-            created_utc?: number
+  const candidates = getSubredditCandidates(countryCode)
+
+  for (const subreddit of candidates) {
+    const url = `https://www.reddit.com/r/${subreddit}/top.json?limit=${limit}&t=day&raw_json=1`
+    try {
+      const text = await fetchText(url)
+      const data = JSON.parse(text) as {
+        data?: {
+          children?: Array<{
+            data?: {
+              title?: string
+              score?: number
+              permalink?: string
+              created_utc?: number
+            }
+          }>
+        }
+      }
+      const trends =
+        data.data?.children?.map((child) => {
+          const score = child.data?.score || 0
+          const createdUtc = child.data?.created_utc
+          return {
+            name: child.data?.title || 'Untitled',
+            url: child.data?.permalink
+              ? `https://www.reddit.com${child.data.permalink}`
+              : 'https://www.reddit.com',
+            source: 'reddit',
+            volume: score ? formatVolume(score) : undefined,
+            timestamp: createdUtc
+              ? new Date(createdUtc * 1000).toISOString()
+              : new Date().toISOString(),
+            country_code: countryCode,
           }
-        }>
+        }) || []
+      if (trends.length > 0) {
+        return trends
+      }
+    } catch (error) {
+      const rssUrl = `https://www.reddit.com/r/${subreddit}/top/.rss?limit=${limit}&t=day`
+      const trends = await fetchRssTrends(rssUrl, 'reddit', countryCode, limit)
+      if (trends.length > 0) {
+        return trends
       }
     }
-    return (
-      data.data?.children?.map((child) => {
-        const score = child.data?.score || 0
-        const createdUtc = child.data?.created_utc
-        return {
-          name: child.data?.title || 'Untitled',
-          url: child.data?.permalink
-            ? `https://www.reddit.com${child.data.permalink}`
-            : 'https://www.reddit.com',
-          source: 'reddit',
-          volume: score ? formatVolume(score) : undefined,
-          timestamp: createdUtc
-            ? new Date(createdUtc * 1000).toISOString()
-            : new Date().toISOString(),
-          country_code: countryCode,
-        }
-      }) || []
-    )
-  } catch (error) {
-    const rssUrl = `https://www.reddit.com/r/${subreddit}/top/.rss?limit=${limit}&t=day`
-    const trends = await fetchRssTrends(rssUrl, 'reddit', countryCode, limit)
-    if (trends.length === 0) {
-      throw error
-    }
-    return trends
   }
+
+  throw new Error(`No Reddit trends for ${countryCode}`)
 }
 
 export async function fetchHackerNewsTrends(countryCode: string): Promise<Trend[]> {

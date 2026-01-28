@@ -2,8 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import type { ReadonlyURLSearchParams } from 'next/navigation'
 import { countries, getCountryName } from '@/lib/countries'
 import SiteHeader from '@/components/SiteHeader'
+import {
+  HomeVariantFour,
+  HomeVariantOne,
+  HomeVariantThree,
+  HomeVariantTwo,
+} from '@/components/home/HomeVariants'
+import type { SourceStat, Trend } from '@/components/home/types'
 
 type ClientHomeProps = {
   initialCountryCode?: string
@@ -18,12 +26,17 @@ function buildTrendsPath(countryCode: string, date?: string | null) {
   return `/${encodeURIComponent(countryCode)}`
 }
 
-type Trend = {
-  name: string
-  url: string
-  source: string
-  volume?: string
-  timestamp: string
+function buildTrendsUrl(
+  countryCode: string,
+  date: string | null | undefined,
+  variant: number,
+  searchParams: ReadonlyURLSearchParams
+) {
+  const path = buildTrendsPath(countryCode, date)
+  const params = new URLSearchParams(searchParams.toString())
+  params.set('variant', variant.toString())
+  const query = params.toString()
+  return query ? `${path}?${query}` : path
 }
 
 type TrendsResponse = {
@@ -31,24 +44,29 @@ type TrendsResponse = {
   failedSources: string[]
 }
 
-type PlatformCard = {
-  id: string
-  label: string
-  accent: string
+type YoutubeTrendsPayload = {
+  categories?: Array<{
+    name: string
+    items: Array<{
+      title: string
+      videoUrl?: string
+    }>
+  }>
+  channels?: Array<{
+    name: string
+    videos: Array<{
+      title: string
+      videoUrl?: string
+    }>
+  }>
+  keywords?: string[]
 }
 
-const platformCards: PlatformCard[] = [
-  { id: 'x', label: 'Trending on X', accent: 'from-[#111827] to-[#1f2937]' },
-  { id: 'reddit', label: 'Trending on Reddit', accent: 'from-[#ea580c] to-[#f97316]' },
-  { id: 'youtube', label: 'Trending on YouTube', accent: 'from-[#dc2626] to-[#ef4444]' },
-  { id: 'instagram', label: 'Trending on Instagram', accent: 'from-[#ec4899] to-[#f59e0b]' },
-]
-
-const platformIcons: Record<string, string> = {
+const sourceLabels: Record<string, string> = {
   x: 'X',
-  reddit: 'r/',
-  youtube: '▶',
-  instagram: '◎',
+  reddit: 'Reddit',
+  youtube: 'YouTube',
+  instagram: 'Instagram',
 }
 
 function getRangeMinutes(range: '24h' | '48h' | '7d') {
@@ -57,13 +75,24 @@ function getRangeMinutes(range: '24h' | '48h' | '7d') {
   return 24 * 60
 }
 
-function formatDisplayVolume(value?: string) {
-  if (!value) return null
-  const numeric = Number(value.replace(/[^\d.]/g, ''))
-  if (Number.isNaN(numeric)) return value
-  const hasSuffix = /[KMB]$/i.test(value.trim())
-  const formatted = numeric % 1 === 0 ? numeric.toString() : numeric.toFixed(1)
-  return hasSuffix ? `${formatted}K` : formatted
+function formatRelativeTime(value: number | null, language: 'EN' | 'IT') {
+  if (!value || Number.isNaN(value)) {
+    return language === 'IT' ? 'N/D' : 'N/A'
+  }
+  const diffMs = Date.now() - value
+  const minutes = Math.max(Math.floor(diffMs / 60000), 0)
+  if (minutes < 5) return language === 'IT' ? 'pochi minuti fa' : 'a few mins ago'
+  if (minutes < 30) return language === 'IT' ? "mezz'ora fa" : 'half an hour ago'
+  if (minutes < 60) return language === 'IT' ? '1 ora fa' : '1 hour ago'
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24)
+    return language === 'IT' ? `${hours} ore fa` : `${hours} hours ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7)
+    return language === 'IT' ? `${days} giorni fa` : `${days} days ago`
+  const weeks = Math.floor(days / 7)
+  if (weeks <= 1) return language === 'IT' ? '1 settimana fa' : '1 week ago'
+  return language === 'IT' ? `${weeks} settimane fa` : `${weeks} weeks ago`
 }
 
 const languageCopy = {
@@ -72,6 +101,8 @@ const languageCopy = {
     selectCountry: 'Select Country',
     date: 'Date',
     timeRange: 'Time Range:',
+    design: 'Design:',
+    updated: 'Updated',
     refreshNow: 'Refresh now',
     refreshing: 'Refreshing...',
     failedToLoad: 'Failed to load trends.',
@@ -86,6 +117,8 @@ const languageCopy = {
     selectCountry: 'Seleziona paese',
     date: 'Data',
     timeRange: 'Intervallo:',
+    design: 'Design:',
+    updated: 'Aggiornato',
     refreshNow: 'Aggiorna ora',
     refreshing: 'Aggiornamento...',
     failedToLoad: 'Impossibile caricare i trend.',
@@ -103,6 +136,8 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
   const selectedCountryCode =
     initialCountryCode || searchParams.get('country') || 'GLOBAL'
   const selectedDate = initialDate ?? searchParams.get('date')
+  const rawVariant = Number(searchParams.get('variant'))
+  const activeVariant = [1, 2, 3, 4].includes(rawVariant) ? rawVariant : 1
   const selectedCountryName = getCountryName(selectedCountryCode)
   const [searchQuery, setSearchQuery] = useState('')
   const [language, setLanguage] = useState<'EN' | 'IT'>('EN')
@@ -121,14 +156,25 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     youtube: 5,
     instagram: 5,
   })
+  const [youtubeFallbackTrends, setYoutubeFallbackTrends] = useState<Trend[]>([])
 
   const handleSelectCountry = (countryCode: string) => {
-    router.push(buildTrendsPath(countryCode, selectedDate), { scroll: false })
+    router.push(buildTrendsUrl(countryCode, selectedDate, activeVariant, searchParams), {
+      scroll: false,
+    })
   }
 
   const handleDateChange = (value: string) => {
     const date = value || null
-    router.push(buildTrendsPath(selectedCountryCode, date), { scroll: false })
+    router.push(buildTrendsUrl(selectedCountryCode, date, activeVariant, searchParams), {
+      scroll: false,
+    })
+  }
+
+  const handleVariantChange = (variant: number) => {
+    router.push(buildTrendsUrl(selectedCountryCode, selectedDate, variant, searchParams), {
+      scroll: false,
+    })
   }
 
   const handleRefresh = async () => {
@@ -136,16 +182,26 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     setIsRefreshing(true)
     setError(null)
     try {
-      const countries =
-        selectedCountryCode === 'GLOBAL'
-          ? 'GLOBAL'
-          : `${selectedCountryCode},GLOBAL`
-      const params = new URLSearchParams({ countries })
-      const res = await fetch(`/api/trends/fetch?${params.toString()}`, {
-        method: 'POST',
-      })
-      if (!res.ok) {
-        throw new Error('Failed to refresh trends')
+      if (selectedCountryCode === 'GLOBAL') {
+        const globalParams = new URLSearchParams({ countries: 'GLOBAL' })
+        const res = await fetch(`/api/trends/fetch?${globalParams.toString()}`, {
+          method: 'POST',
+        })
+        if (!res.ok) {
+          throw new Error('Failed to refresh trends')
+        }
+        const backgroundParams = new URLSearchParams({ countries: 'ALL' })
+        void fetch(`/api/trends/fetch?${backgroundParams.toString()}`, {
+          method: 'POST',
+        })
+      } else {
+        const params = new URLSearchParams({ countries: selectedCountryCode })
+        const res = await fetch(`/api/trends/fetch?${params.toString()}`, {
+          method: 'POST',
+        })
+        if (!res.ok) {
+          throw new Error('Failed to refresh trends')
+        }
       }
       setRefreshNonce((n) => n + 1)
     } catch (err) {
@@ -279,7 +335,7 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     return mixed.length > 0 ? mixed : hotGlobal
   }, [filteredGlobalTrends, hotGlobal])
 
-  const platformTrends = useMemo(() => {
+  const basePlatformTrends = useMemo(() => {
     const bySource: Record<string, Trend[]> = {}
     filteredTrends.forEach((trend) => {
       const key = trend.source
@@ -291,8 +347,20 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     return bySource
   }, [filteredTrends])
 
+  const hasYoutubeData = (basePlatformTrends.youtube || []).length > 0
+
+  const displayPlatformTrends = useMemo(() => {
+    if (hasYoutubeData || youtubeFallbackTrends.length === 0) {
+      return basePlatformTrends
+    }
+    return {
+      ...basePlatformTrends,
+      youtube: youtubeFallbackTrends,
+    }
+  }, [basePlatformTrends, hasYoutubeData, youtubeFallbackTrends])
+
   const handleShowMore = (platformId: string) => {
-    const totalItems = (platformTrends[platformId] || []).length
+    const totalItems = (displayPlatformTrends[platformId] || []).length
     setPlatformLimits((prev) => ({
       ...prev,
       [platformId]: Math.min((prev[platformId] || 5) + 5, totalItems),
@@ -300,6 +368,115 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
   }
 
   const copy = languageCopy[language]
+
+  const sourceBreakdown = useMemo<SourceStat[]>(() => {
+    const entries = Object.entries(displayPlatformTrends).map(([source, items]) => ({
+      id: source,
+      label: sourceLabels[source] ?? source,
+      count: items.length,
+    }))
+    return entries.sort((a, b) => b.count - a.count)
+  }, [displayPlatformTrends])
+
+  const lastUpdatedLabel = useMemo(() => {
+    const timestamps = [...filteredTrends, ...filteredGlobalTrends]
+      .map((trend) => Date.parse(trend.timestamp))
+      .filter((value) => Number.isFinite(value))
+    if (timestamps.length === 0) {
+      return language === 'IT' ? 'N/D' : 'N/A'
+    }
+    const latest = Math.max(...timestamps)
+    const formatter = new Intl.DateTimeFormat(language === 'IT' ? 'it-IT' : 'en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
+    return formatter.format(new Date(latest))
+  }, [filteredTrends, filteredGlobalTrends, language])
+
+  const lastUpdatedRelative = useMemo(() => {
+    const timestamps = [...filteredTrends, ...filteredGlobalTrends]
+      .map((trend) => Date.parse(trend.timestamp))
+      .filter((value) => Number.isFinite(value))
+    if (timestamps.length === 0) {
+      return formatRelativeTime(null, language)
+    }
+    return formatRelativeTime(Math.max(...timestamps), language)
+  }, [filteredTrends, filteredGlobalTrends, language])
+
+  const watchlist = useMemo(() => {
+    const base = filteredTrends.length > 0 ? filteredTrends : filteredGlobalTrends
+    return base.slice(0, 6)
+  }, [filteredTrends, filteredGlobalTrends])
+
+  useEffect(() => {
+    if (isLoading || hasYoutubeData) {
+      setYoutubeFallbackTrends([])
+      return
+    }
+    let isActive = true
+
+    const load = async () => {
+      try {
+        const fetchRegion = async (region: string) => {
+          const params = new URLSearchParams({
+            region,
+            maxResults: '20',
+          })
+          const res = await fetch(`/api/youtube-trends?${params.toString()}`)
+          if (!res.ok) {
+            throw new Error('Failed to load YouTube trends')
+          }
+          return (await res.json()) as YoutubeTrendsPayload
+        }
+
+        const buildTrends = (payload: YoutubeTrendsPayload) => {
+          const categoryItems =
+            payload.categories?.flatMap((category) => category.items || []) || []
+          const channelItems =
+            payload.channels?.flatMap((channel) => channel.videos || []) || []
+          const keywordItems = payload.keywords || []
+          const picks =
+            categoryItems.length > 0
+              ? categoryItems
+              : channelItems.length > 0
+                ? channelItems
+                : keywordItems.map((keyword) => ({
+                    title: keyword,
+                    videoUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(keyword)}`,
+                  }))
+          return picks.slice(0, 10).map((item) => ({
+            name: item.title,
+            url: item.videoUrl || 'https://www.youtube.com',
+            source: 'youtube',
+            timestamp: new Date().toISOString(),
+          }))
+        }
+
+        const payload = await fetchRegion(selectedCountryCode)
+        if (!isActive) return
+        let trends = buildTrends(payload)
+
+        if (trends.length === 0 && selectedCountryCode !== 'GLOBAL') {
+          const globalPayload = await fetchRegion('GLOBAL')
+          if (!isActive) return
+          trends = buildTrends(globalPayload)
+        }
+
+        setYoutubeFallbackTrends(trends)
+      } catch {
+        if (!isActive) return
+        setYoutubeFallbackTrends([])
+      } finally {
+        if (!isActive) return
+      }
+    }
+
+    void load()
+
+    return () => {
+      isActive = false
+    }
+  }, [selectedCountryCode, selectedDate, isLoading, hasYoutubeData])
 
   return (
     <div className="min-h-screen bg-[#f4f6fb] text-[#1f2937]">
@@ -312,8 +489,8 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
       />
 
       <main className="relative max-w-[80%] mx-auto px-6 py-6 space-y-6 overflow-x-hidden">
-        <div className="flex flex-wrap items-center gap-4 bg-white/90 border border-[#e5e7eb] rounded-2xl px-4 py-3 shadow-sm">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-start gap-4 bg-white/90 border border-[#e5e7eb] rounded-2xl px-4 py-3 shadow-sm">
+          <div className="relative flex items-center gap-2 pb-5">
             <span className="text-sm text-[#6b7280]">{copy.selectCountry}</span>
             <select
               value={selectedCountryCode}
@@ -326,6 +503,9 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                 </option>
               ))}
             </select>
+            <span className="absolute left-0 bottom-0 text-xs text-[#9ca3af] whitespace-nowrap">
+              {copy.updated} {lastUpdatedRelative}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-[#6b7280]">{copy.date}</span>
@@ -336,8 +516,25 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
               className="border border-[#e5e7eb] rounded-lg px-3 py-2 text-sm bg-white shadow-sm"
             />
           </div>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-sm text-[#6b7280]">{copy.timeRange}</span>
+          <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+            <span className="text-sm text-[#6b7280]">{copy.design}</span>
+            <div className="flex items-center gap-1 rounded-full border border-[#e5e7eb] bg-[#f8fafc] p-1">
+              {[1, 2, 3, 4].map((variant) => (
+                <button
+                  key={variant}
+                  type="button"
+                  onClick={() => handleVariantChange(variant)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                    activeVariant === variant
+                      ? 'bg-[#111827] text-white'
+                      : 'text-[#6b7280] hover:text-[#111827]'
+                  }`}
+                >
+                  {variant}
+                </button>
+              ))}
+            </div>
+            <span className="text-sm text-[#6b7280] ml-2">{copy.timeRange}</span>
             {(['24h', '48h', '7d'] as const).map((range) => (
               <button
                 key={range}
@@ -352,16 +549,19 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
                 {range}
               </button>
             ))}
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={isRefreshing || Boolean(selectedDate)}
-              className="px-3 py-1.5 rounded-lg text-sm border transition border-[#e5e7eb] text-[#6b7280] hover:border-[#c7d2fe] hover:text-[#374151] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isRefreshing ? copy.refreshing : copy.refreshNow}
-            </button>
+            <div>
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={isRefreshing || Boolean(selectedDate)}
+                className="px-3 py-1.5 rounded-lg text-sm border transition border-[#e5e7eb] text-[#6b7280] hover:border-[#c7d2fe] hover:text-[#374151] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRefreshing ? copy.refreshing : copy.refreshNow}
+              </button>
+            </div>
           </div>
         </div>
+
 
         {error && (
           <div className="bg-[#fee2e2] border border-[#fecaca] text-[#991b1b] rounded-lg px-4 py-2 text-sm">
@@ -369,129 +569,83 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
           </div>
         )}
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="bg-white border border-[#e5e7eb] rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 text-lg font-semibold mb-3">
-              {copy.hotTopicsGlobal} <span className="text-[#f97316]">🔥</span>
-            </div>
-            <div className="space-y-3 text-sm text-[#1f2937]">
-              {isLoading ? (
-                <div className="text-[#9ca3af]">{copy.loading}</div>
-              ) : mixedHotGlobal.length === 0 ? (
-                <div className="text-[#9ca3af]">{copy.noTrends}</div>
-              ) : (
-                mixedHotGlobal.map((trend) => (
-                  <a
-                    key={`${trend.source}-${trend.timestamp}-${trend.url}`}
-                    href={trend.url || '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
-                  >
-                    <span className="font-medium">{trend.name}</span>
-                    {false && trend.volume && (
-                      <span className="text-[11px] font-semibold text-[#1f2937] bg-[#eef2ff] border border-[#c7d2fe] rounded-full px-2 py-0.5">
-                        {formatDisplayVolume(trend.volume)}
-                      </span>
-                    )}
-                  </a>
-                ))
-              )}
-            </div>
+        {failedSources.length > 0 && (
+          <div className="bg-[#fef3c7] border border-[#fde68a] text-[#92400e] rounded-lg px-4 py-2 text-sm">
+            {copy.sourcesUnavailable} {failedSources.join(', ')}
           </div>
+        )}
 
-          <div className="bg-white border border-[#e5e7eb] rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 text-lg font-semibold mb-3">
-              {copy.hotTopicsIn} {hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
-              <span className="text-[#22c55e]">🏁</span>
-            </div>
-            <div className="space-y-3 text-sm text-[#1f2937]">
-              {isLoading ? (
-                <div className="text-[#9ca3af]">{copy.loading}</div>
-              ) : hotLocal.length === 0 ? (
-                <div className="text-[#9ca3af]">{copy.noTrends}</div>
-              ) : (
-                hotLocal.map((trend) => (
-                  <a
-                    key={`${trend.source}-${trend.timestamp}-${trend.url}`}
-                    href={trend.url || '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
-                  >
-                    <span className="font-medium">{trend.name}</span>
-                    {false && trend.volume && (
-                      <span className="text-[11px] font-semibold text-[#1f2937] bg-[#eef2ff] border border-[#c7d2fe] rounded-full px-2 py-0.5">
-                        {formatDisplayVolume(trend.volume)}
-                      </span>
-                    )}
-                  </a>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+        {activeVariant === 1 && (
+          <HomeVariantOne
+            copy={copy}
+            language={language}
+            selectedCountryName={selectedCountryName}
+            hotCountryName={hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
+            isLoading={isLoading}
+            mixedHotGlobal={mixedHotGlobal}
+            hotLocal={hotLocal}
+            platformTrends={displayPlatformTrends}
+            platformLimits={platformLimits}
+            onShowMore={handleShowMore}
+            sourceBreakdown={sourceBreakdown}
+            watchlist={watchlist}
+            lastUpdatedLabel={lastUpdatedLabel}
+          />
+        )}
 
-        <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
-          {platformCards.map((card) => {
-            const limit = platformLimits[card.id] || 5
-            const totalItems = (platformTrends[card.id] || []).length
-            const items = (platformTrends[card.id] || []).slice(0, limit)
-            return (
-              <div key={card.id} className="bg-white border border-[#e5e7eb] rounded-2xl overflow-hidden shadow-sm flex flex-col">
-                <div className={`px-4 py-3 text-white font-semibold bg-gradient-to-r ${card.accent}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">
-                      {platformIcons[card.id] || '•'}
-                    </span>
-                    <span>
-                      {language === 'IT'
-                        ? card.label.replace('Trending on', 'Trend su')
-                        : card.label}
-                    </span>
-                  </div>
-                </div>
-                <div className="p-4 text-sm text-[#1f2937] max-h-80 overflow-y-auto space-y-3 pr-2 light-scrollbar flex-1">
-                  {isLoading ? (
-                    <div className="text-[#9ca3af]">{copy.loading}</div>
-                  ) : items.length === 0 ? (
-                    <div className="text-[#9ca3af]">{copy.noTrends}</div>
-                  ) : (
-                    items.map((trend) => (
-                      <a
-                        key={`${trend.source}-${trend.timestamp}-${trend.url}`}
-                        href={trend.url || '#'}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition group"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-medium line-clamp-3 group-hover:text-[#111827]">{trend.name}</div>
-                        </div>
-                        {false && trend.volume && (
-                          <span className="text-[11px] font-semibold text-[#1f2937] bg-[#eef2ff] border border-[#c7d2fe] rounded-full px-2 py-0.5">
-                            {formatDisplayVolume(trend.volume)}
-                          </span>
-                        )}
-                      </a>
-                    ))
-                  )}
-                </div>
-                {!isLoading && totalItems > limit && (
-                  <div className="border-t border-[#eef2f7] px-4 py-3 bg-white">
-                    <button
-                      type="button"
-                      onClick={() => handleShowMore(card.id)}
-                      className="w-full px-3 py-2 rounded-lg text-xs font-medium border border-[#e5e7eb] text-[#6b7280] hover:text-[#1f2937] hover:border-[#c7d2fe]"
-                    >
-                      Show more
-                    </button>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+        {activeVariant === 2 && (
+          <HomeVariantTwo
+            copy={copy}
+            language={language}
+            selectedCountryName={selectedCountryName}
+            hotCountryName={hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
+            isLoading={isLoading}
+            mixedHotGlobal={mixedHotGlobal}
+            hotLocal={hotLocal}
+            platformTrends={displayPlatformTrends}
+            platformLimits={platformLimits}
+            onShowMore={handleShowMore}
+            sourceBreakdown={sourceBreakdown}
+            watchlist={watchlist}
+            lastUpdatedLabel={lastUpdatedLabel}
+          />
+        )}
+
+        {activeVariant === 3 && (
+          <HomeVariantThree
+            copy={copy}
+            language={language}
+            selectedCountryName={selectedCountryName}
+            hotCountryName={hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
+            isLoading={isLoading}
+            mixedHotGlobal={mixedHotGlobal}
+            hotLocal={hotLocal}
+            platformTrends={displayPlatformTrends}
+            platformLimits={platformLimits}
+            onShowMore={handleShowMore}
+            sourceBreakdown={sourceBreakdown}
+            watchlist={watchlist}
+            lastUpdatedLabel={lastUpdatedLabel}
+          />
+        )}
+
+        {activeVariant === 4 && (
+          <HomeVariantFour
+            copy={copy}
+            language={language}
+            selectedCountryName={selectedCountryName}
+            hotCountryName={hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
+            isLoading={isLoading}
+            mixedHotGlobal={mixedHotGlobal}
+            hotLocal={hotLocal}
+            platformTrends={displayPlatformTrends}
+            platformLimits={platformLimits}
+            onShowMore={handleShowMore}
+            sourceBreakdown={sourceBreakdown}
+            watchlist={watchlist}
+            lastUpdatedLabel={lastUpdatedLabel}
+          />
+        )}
 
         <div className="text-center text-xs text-[#9ca3af] py-6 border-t border-[#e5e7eb]">
           Terms · Privacy · API Docs · About · Contact

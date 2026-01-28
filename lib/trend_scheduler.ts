@@ -61,7 +61,7 @@ async function insertTrends(countryCode: string) {
     trend.url,
     trend.source,
     trend.volume || null,
-    trend.timestamp,
+    new Date(trend.timestamp),
     trend.country_code,
   ])
 
@@ -76,7 +76,7 @@ async function insertTrends(countryCode: string) {
         WHERE t.name = v.name
           AND t.source = v.source
           AND t.country_code = v.country_code
-          AND date_trunc('hour', t.timestamp) = date_trunc('hour', v.timestamp)
+          AND date_trunc('hour', t.timestamp) = date_trunc('hour', v.timestamp::timestamp)
       )
     `,
     params

@@ -4,6 +4,7 @@ export type Trend = {
   source: string
   volume?: string
   timestamp: string
+  stale?: boolean
 }
 
 export type SourceStat = {

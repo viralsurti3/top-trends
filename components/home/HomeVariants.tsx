@@ -64,10 +64,12 @@ function TopicListCard({
               href={trend.url || '#'}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
+              className="flex flex-col gap-1 rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition sm:flex-row sm:items-center sm:justify-between sm:gap-3"
             >
-              <span className="font-medium">{trend.name}</span>
-              <span className="text-[11px] font-semibold text-[#6b7280] bg-[#f3f4f6] border border-[#e5e7eb] rounded-full px-2 py-0.5">
+              <span className="font-medium min-w-0 break-words sm:truncate">
+                {trend.name}
+              </span>
+              <span className="text-[11px] font-semibold text-[#6b7280] bg-[#f3f4f6] border border-[#e5e7eb] rounded-full px-2 py-0.5 self-start sm:self-auto shrink-0">
                 {sourceLabels[trend.source] ?? trend.source}
               </span>
             </a>
@@ -135,9 +137,9 @@ function WatchlistPanel({
               href={trend.url || '#'}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
+              className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition"
             >
-              <span className="font-medium">{trend.name}</span>
+              <span className="font-medium min-w-0 truncate">{trend.name}</span>
               <span className="text-[11px] font-semibold text-[#6b7280]">
                 {sourceLabels[trend.source] ?? trend.source}
               </span>
@@ -166,6 +168,19 @@ export function HomeVariantOne(props: HomeVariantProps) {
   } = props
   return (
     <div className="space-y-6">
+      <PlatformGrid
+        platformTrends={platformTrends}
+        platformLimits={platformLimits}
+        onShowMore={onShowMore}
+        isLoading={isLoading}
+        language={language}
+        labels={{
+          loading: copy.loading,
+          noTrends: copy.noTrends,
+          showMore: language === 'IT' ? 'Mostra di piu' : 'Show more',
+        }}
+      />
+
       <div className="grid gap-6 md:grid-cols-2">
         <TopicListCard
           title={`${copy.hotTopicsGlobal} 🔥`}
@@ -207,18 +222,6 @@ export function HomeVariantOne(props: HomeVariantProps) {
         </div>
       </div>
 
-      <PlatformGrid
-        platformTrends={platformTrends}
-        platformLimits={platformLimits}
-        onShowMore={onShowMore}
-        isLoading={isLoading}
-        language={language}
-        labels={{
-          loading: copy.loading,
-          noTrends: copy.noTrends,
-          showMore: language === 'IT' ? 'Mostra di piu' : 'Show more',
-        }}
-      />
     </div>
   )
 }
@@ -242,7 +245,7 @@ export function HomeVariantTwo(props: HomeVariantProps) {
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
         <div className="bg-white border border-[#e5e7eb] rounded-3xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
             <div>
               <div className="text-sm text-[#6b7280]">
                 {language === 'IT' ? 'Ultimo aggiornamento' : 'Last updated'}
@@ -288,7 +291,7 @@ export function HomeVariantTwo(props: HomeVariantProps) {
       </div>
 
       <div className="bg-white border border-[#e5e7eb] rounded-2xl p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
             <div className="text-sm text-[#6b7280]">
               {language === 'IT' ? 'Sezione piattaforme' : 'Platform feed'}
@@ -395,7 +398,7 @@ export function HomeVariantThree(props: HomeVariantProps) {
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="bg-white border border-[#e5e7eb] rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
             <div>
               <div className="text-sm text-[#6b7280]">
                 {language === 'IT' ? 'Flusso centrale' : 'Central feed'}
@@ -415,9 +418,9 @@ export function HomeVariantThree(props: HomeVariantProps) {
                 href={trend.url || '#'}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition border border-transparent hover:border-[#e5e7eb]"
+                className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-[#f8fafc] transition border border-transparent hover:border-[#e5e7eb]"
               >
-                <span className="font-medium">{trend.name}</span>
+                <span className="font-medium min-w-0 truncate">{trend.name}</span>
                 <span className="text-[11px] font-semibold text-[#6b7280]">
                   {sourceLabels[trend.source] ?? trend.source}
                 </span>
@@ -445,7 +448,7 @@ export function HomeVariantThree(props: HomeVariantProps) {
       </div>
 
       <div className="bg-white border border-[#e5e7eb] rounded-2xl p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
             <div className="text-sm text-[#6b7280]">
               {language === 'IT' ? 'Trend su tutte le piattaforme' : 'Trending across platforms'}
@@ -552,7 +555,7 @@ export function HomeVariantFour(props: HomeVariantProps) {
       </div>
 
       <div className="bg-white border border-[#e5e7eb] rounded-2xl p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
             <div className="text-sm text-[#6b7280]">
               {language === 'IT' ? 'Trend per piattaforma' : 'Trends by platform'}

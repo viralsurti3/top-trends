@@ -97,9 +97,9 @@ export default function AdminPage() {
     <main className="min-h-screen bg-[#f4f6fb] text-[#1f2937] relative">
       <div className="absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-[#ffffff] via-[#f8fafc] to-transparent pointer-events-none -z-10" />
       <SiteHeader />
-      <div className="max-w-[80%] mx-auto px-6 py-16">
-        <div className="bg-white border border-[#e5e7eb] rounded-2xl shadow-sm p-8">
-          <h1 className="text-2xl font-semibold text-[#111827]">CMS Admin</h1>
+      <div className="max-w-full lg:max-w-[80%] mx-auto px-4 sm:px-6 py-12 sm:py-16">
+        <div className="bg-white border border-[#e5e7eb] rounded-2xl shadow-sm p-6 sm:p-8">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-[#111827]">CMS Admin</h1>
           {!authenticated ? (
             <form onSubmit={handleLogin} className="mt-6 space-y-4 max-w-md">
               <div>

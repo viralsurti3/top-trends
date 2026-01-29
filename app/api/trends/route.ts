@@ -11,6 +11,7 @@ type Trend = {
   volume?: string
   timestamp: string
   country_code: string
+  stale?: boolean
 }
 
 function normalizeSources(value: string | null): string[] {
@@ -216,7 +217,45 @@ export async function GET(request: Request) {
     LIMIT 1000
   `
 
-  const rows = await query<SourceTrend[]>(sql, params)
+  let rows = await query<SourceTrend[]>(sql, params)
+
+  const shouldFallbackReddit =
+    !date &&
+    !Number.isNaN(realtimeWindow) &&
+    realtimeWindow > 0 &&
+    (sources.length === 0 || sources.includes('reddit'))
+  const hasReddit = rows.some((trend) => trend.source === 'reddit')
+
+  if (shouldFallbackReddit && !hasReddit) {
+    const fallbackSql = `
+      SELECT name, url, source, volume, timestamp, country_code
+      FROM trends
+      WHERE country_code = $1
+        AND source = 'reddit'
+      ORDER BY timestamp DESC
+      LIMIT 20
+    `
+    const fallbackRows = await query<SourceTrend[]>(fallbackSql, [countryCode])
+    if (fallbackRows.length > 0) {
+      const existingKeys = new Set(
+        rows.map((trend) => `${trend.name}|${trend.source}|${trend.country_code}`)
+      )
+      const dedupedFallback = fallbackRows.filter((trend) => {
+        const key = `${trend.name}|${trend.source}|${trend.country_code}`
+        if (existingKeys.has(key)) return false
+        existingKeys.add(key)
+        return true
+      })
+      rows = [
+        ...rows,
+        ...dedupedFallback.map((trend) => ({
+          ...trend,
+          stale: true,
+        })),
+      ]
+    }
+  }
+
   return NextResponse.json({ trends: rows, failedSources })
 }
 

@@ -99,16 +99,23 @@ function formatFetchError(error: unknown): string {
   return String(error)
 }
 
-async function fetchText(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'top-trends-dashboard/1.0',
-    },
-  })
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} for ${url}`)
+async function fetchText(url: string, timeoutMs = 15000): Promise<string> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'top-trends-dashboard/1.0',
+      },
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} for ${url}`)
+    }
+    return res.text()
+  } finally {
+    clearTimeout(timeoutId)
   }
-  return res.text()
 }
 
 function jina(url: string): string {
@@ -123,7 +130,10 @@ export async function fetchRedditTrends(countryCode: string): Promise<Trend[]> {
   for (const subreddit of candidates) {
     const url = `https://www.reddit.com/r/${subreddit}/top.json?limit=${limit}&t=day&raw_json=1`
     try {
-      const text = await fetchText(url)
+      let text = await fetchText(url)
+      if (!text.trim().startsWith('{')) {
+        text = await fetchText(jina(url))
+      }
       const data = JSON.parse(text) as {
         data?: {
           children?: Array<{
@@ -158,7 +168,7 @@ export async function fetchRedditTrends(countryCode: string): Promise<Trend[]> {
       }
     } catch (error) {
       const rssUrl = `https://www.reddit.com/r/${subreddit}/top/.rss?limit=${limit}&t=day`
-      const trends = await fetchRssTrends(rssUrl, 'reddit', countryCode, limit)
+      const trends = await fetchRssTrends(jina(rssUrl), 'reddit', countryCode, limit)
       if (trends.length > 0) {
         return trends
       }

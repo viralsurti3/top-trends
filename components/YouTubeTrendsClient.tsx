@@ -250,16 +250,16 @@ export default function YouTubeTrendsClient() {
         language={language}
         onLanguageChange={setLanguage}
       />
-      <div className="relative max-w-[80%] mx-auto px-6 py-10 space-y-8">
-        <div className="bg-white border border-[#e5e7eb] rounded-2xl shadow-sm p-8">
-          <h1 className="text-3xl font-semibold text-[#111827]">{copy.title}</h1>
+      <div className="relative max-w-full lg:max-w-[80%] mx-auto px-4 sm:px-6 py-10 space-y-8">
+        <div className="bg-white border border-[#e5e7eb] rounded-2xl shadow-sm p-6 sm:p-8">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-[#111827]">{copy.title}</h1>
           <p className="mt-3 text-base text-[#4b5563]">{copy.subtitle}</p>
-          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#6b7280]">
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center flex-wrap gap-3 text-sm text-[#6b7280]">
             <span>{copy.region}</span>
             <select
               value={region}
               onChange={(e) => setRegion(e.target.value)}
-              className="border border-[#e5e7eb] rounded-lg px-3 py-2 text-sm bg-white shadow-sm text-[#111827]"
+              className="w-full sm:w-auto border border-[#e5e7eb] rounded-lg px-3 py-2 text-sm bg-white shadow-sm text-[#111827]"
             >
               {countries.map((country) => (
                 <option key={country.code} value={country.code}>
@@ -274,7 +274,7 @@ export default function YouTubeTrendsClient() {
               type="button"
               onClick={handleLoadTrends}
               disabled={isLoading}
-              className="ml-auto px-4 py-2 rounded-lg text-sm font-medium border border-[#e5e7eb] text-[#1f2937] hover:border-[#c7d2fe] hover:text-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="sm:ml-auto px-4 py-2 rounded-lg text-sm font-medium border border-[#e5e7eb] text-[#1f2937] hover:border-[#c7d2fe] hover:text-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? copy.loadingButton : copy.load}
             </button>
@@ -318,7 +318,7 @@ export default function YouTubeTrendsClient() {
                         key={`${channel.rank}-${channel.name}`}
                         className="border border-[#eef2f7] rounded-xl p-4"
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                           <div className="font-semibold text-[#111827]">
                             {channel.rank}. {channel.name}
                           </div>

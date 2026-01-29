@@ -291,7 +291,8 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     const now = Date.now()
     return trends.filter((trend) => {
       const ts = Date.parse(trend.timestamp)
-      const withinRange = Number.isNaN(ts) || now - ts <= rangeMinutes * 60000
+      const withinRange =
+        trend.stale || Number.isNaN(ts) || now - ts <= rangeMinutes * 60000
       const matchesQuery = !query || trend.name.toLowerCase().includes(query)
       return withinRange && matchesQuery
     })
@@ -302,7 +303,8 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     const now = Date.now()
     return globalTrends.filter((trend) => {
       const ts = Date.parse(trend.timestamp)
-      const withinRange = Number.isNaN(ts) || now - ts <= rangeMinutes * 60000
+      const withinRange =
+        trend.stale || Number.isNaN(ts) || now - ts <= rangeMinutes * 60000
       const matchesQuery = !query || trend.name.toLowerCase().includes(query)
       return withinRange && matchesQuery
     })
@@ -488,73 +490,81 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
         onLanguageChange={setLanguage}
       />
 
-      <main className="relative max-w-[80%] mx-auto px-6 py-6 space-y-6 overflow-x-hidden">
-        <div className="flex flex-wrap items-start gap-4 bg-white/90 border border-[#e5e7eb] rounded-2xl px-4 py-3 shadow-sm">
-          <div className="relative flex items-center gap-2 pb-5">
-            <span className="text-sm text-[#6b7280]">{copy.selectCountry}</span>
-            <select
-              value={selectedCountryCode}
-              onChange={(e) => handleSelectCountry(e.target.value)}
-              className="border border-[#e5e7eb] rounded-lg px-3 py-2 text-sm bg-white shadow-sm"
-            >
-              {countries.map((country) => (
-                <option key={country.code} value={country.code}>
-                  {country.name}
-                </option>
-              ))}
-            </select>
-            <span className="absolute left-0 bottom-0 text-xs text-[#9ca3af] whitespace-nowrap">
+      <main className="relative max-w-full lg:max-w-[80%] mx-auto px-4 sm:px-6 py-6 space-y-6 overflow-x-hidden">
+        <div className="flex flex-col gap-4 bg-white/90 border border-[#e5e7eb] rounded-2xl px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:gap-6">
+            <div className="flex flex-col gap-2 lg:w-[420px]">
+              <span className="text-sm text-[#6b7280]">{copy.selectCountry}</span>
+              <select
+                value={selectedCountryCode}
+                onChange={(e) => handleSelectCountry(e.target.value)}
+                className="w-full border border-[#e5e7eb] rounded-lg px-3 py-2 text-sm bg-white shadow-sm"
+              >
+                {countries.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-2 lg:w-56">
+              <span className="text-sm text-[#6b7280]">{copy.date}</span>
+              <input
+                type="date"
+                value={selectedDate ?? ''}
+                onChange={(e) => handleDateChange(e.target.value)}
+                className="w-full border border-[#e5e7eb] rounded-lg px-3 py-2 text-sm bg-white shadow-sm"
+              />
+            </div>
+            <span className="text-xs text-[#9ca3af] lg:mb-1">
               {copy.updated} {lastUpdatedRelative}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-[#6b7280]">{copy.date}</span>
-            <input
-              type="date"
-              value={selectedDate ?? ''}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="border border-[#e5e7eb] rounded-lg px-3 py-2 text-sm bg-white shadow-sm"
-            />
-          </div>
-          <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
-            <span className="text-sm text-[#6b7280]">{copy.design}</span>
-            <div className="flex items-center gap-1 rounded-full border border-[#e5e7eb] bg-[#f8fafc] p-1">
-              {[1, 2, 3, 4].map((variant) => (
-                <button
-                  key={variant}
-                  type="button"
-                  onClick={() => handleVariantChange(variant)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
-                    activeVariant === variant
-                      ? 'bg-[#111827] text-white'
-                      : 'text-[#6b7280] hover:text-[#111827]'
-                  }`}
-                >
-                  {variant}
-                </button>
-              ))}
+          <div className="flex flex-col gap-3 w-full lg:flex-row lg:items-end lg:justify-end lg:gap-6">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm text-[#6b7280]">{copy.design}</span>
+              <div className="flex flex-wrap items-center gap-1 rounded-full border border-[#e5e7eb] bg-[#f8fafc] p-1">
+                {[1, 2, 3, 4].map((variant) => (
+                  <button
+                    key={variant}
+                    type="button"
+                    onClick={() => handleVariantChange(variant)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                      activeVariant === variant
+                        ? 'bg-[#111827] text-white'
+                        : 'text-[#6b7280] hover:text-[#111827]'
+                    }`}
+                  >
+                    {variant}
+                  </button>
+                ))}
+              </div>
             </div>
-            <span className="text-sm text-[#6b7280] ml-2">{copy.timeRange}</span>
-            {(['24h', '48h', '7d'] as const).map((range) => (
-              <button
-                key={range}
-                type="button"
-                onClick={() => setTimeRange(range)}
-                className={`px-3 py-1.5 rounded-lg text-sm border transition ${
-                  timeRange === range
-                    ? 'bg-[#2563eb] text-white border-[#2563eb] shadow-sm'
-                    : 'border-[#e5e7eb] text-[#6b7280] hover:border-[#c7d2fe] hover:text-[#374151]'
-                }`}
-              >
-                {range}
-              </button>
-            ))}
-            <div>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm text-[#6b7280]">{copy.timeRange}</span>
+              <div className="flex flex-wrap gap-2">
+                {(['24h', '48h', '7d'] as const).map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => setTimeRange(range)}
+                    className={`px-3 py-1.5 rounded-lg text-sm border transition ${
+                      timeRange === range
+                        ? 'bg-[#2563eb] text-white border-[#2563eb] shadow-sm'
+                        : 'border-[#e5e7eb] text-[#6b7280] hover:border-[#c7d2fe] hover:text-[#374151]'
+                    }`}
+                  >
+                    {range}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="lg:self-end">
               <button
                 type="button"
                 onClick={handleRefresh}
                 disabled={isRefreshing || Boolean(selectedDate)}
-                className="px-3 py-1.5 rounded-lg text-sm border transition border-[#e5e7eb] text-[#6b7280] hover:border-[#c7d2fe] hover:text-[#374151] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 rounded-lg text-sm border transition border-[#e5e7eb] text-[#6b7280] hover:border-[#c7d2fe] hover:text-[#374151] disabled:opacity-50 disabled:cursor-not-allowed lg:w-auto"
               >
                 {isRefreshing ? copy.refreshing : copy.refreshNow}
               </button>

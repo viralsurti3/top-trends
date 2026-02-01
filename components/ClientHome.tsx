@@ -136,8 +136,7 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
   const selectedCountryCode =
     initialCountryCode || searchParams.get('country') || 'GLOBAL'
   const selectedDate = initialDate ?? searchParams.get('date')
-  const rawVariant = Number(searchParams.get('variant'))
-  const activeVariant = [1, 2, 3, 4].includes(rawVariant) ? rawVariant : 1
+  const activeVariant = 1
   const selectedCountryName = getCountryName(selectedCountryCode)
   const [searchQuery, setSearchQuery] = useState('')
   const [language, setLanguage] = useState<'EN' | 'IT'>('EN')
@@ -171,11 +170,6 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
     })
   }
 
-  const handleVariantChange = (variant: number) => {
-    router.push(buildTrendsUrl(selectedCountryCode, selectedDate, variant, searchParams), {
-      scroll: false,
-    })
-  }
 
   const handleRefresh = async () => {
     if (selectedDate) return
@@ -522,25 +516,6 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
           </div>
           <div className="flex flex-col gap-3 w-full lg:flex-row lg:items-end lg:justify-end lg:gap-6">
             <div className="flex flex-col gap-2">
-              <span className="text-sm text-[#6b7280]">{copy.design}</span>
-              <div className="flex flex-wrap items-center gap-1 rounded-full border border-[#e5e7eb] bg-[#f8fafc] p-1">
-                {[1, 2, 3, 4].map((variant) => (
-                  <button
-                    key={variant}
-                    type="button"
-                    onClick={() => handleVariantChange(variant)}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
-                      activeVariant === variant
-                        ? 'bg-[#111827] text-white'
-                        : 'text-[#6b7280] hover:text-[#111827]'
-                    }`}
-                  >
-                    {variant}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
               <span className="text-sm text-[#6b7280]">{copy.timeRange}</span>
               <div className="flex flex-wrap gap-2">
                 {(['24h', '48h', '7d'] as const).map((range) => (
@@ -585,77 +560,21 @@ export default function ClientHome({ initialCountryCode, initialDate }: ClientHo
           </div>
         )}
 
-        {activeVariant === 1 && (
-          <HomeVariantOne
-            copy={copy}
-            language={language}
-            selectedCountryName={selectedCountryName}
-            hotCountryName={hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
-            isLoading={isLoading}
-            mixedHotGlobal={mixedHotGlobal}
-            hotLocal={hotLocal}
-            platformTrends={displayPlatformTrends}
-            platformLimits={platformLimits}
-            onShowMore={handleShowMore}
-            sourceBreakdown={sourceBreakdown}
-            watchlist={watchlist}
-            lastUpdatedLabel={lastUpdatedLabel}
-          />
-        )}
-
-        {activeVariant === 2 && (
-          <HomeVariantTwo
-            copy={copy}
-            language={language}
-            selectedCountryName={selectedCountryName}
-            hotCountryName={hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
-            isLoading={isLoading}
-            mixedHotGlobal={mixedHotGlobal}
-            hotLocal={hotLocal}
-            platformTrends={displayPlatformTrends}
-            platformLimits={platformLimits}
-            onShowMore={handleShowMore}
-            sourceBreakdown={sourceBreakdown}
-            watchlist={watchlist}
-            lastUpdatedLabel={lastUpdatedLabel}
-          />
-        )}
-
-        {activeVariant === 3 && (
-          <HomeVariantThree
-            copy={copy}
-            language={language}
-            selectedCountryName={selectedCountryName}
-            hotCountryName={hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
-            isLoading={isLoading}
-            mixedHotGlobal={mixedHotGlobal}
-            hotLocal={hotLocal}
-            platformTrends={displayPlatformTrends}
-            platformLimits={platformLimits}
-            onShowMore={handleShowMore}
-            sourceBreakdown={sourceBreakdown}
-            watchlist={watchlist}
-            lastUpdatedLabel={lastUpdatedLabel}
-          />
-        )}
-
-        {activeVariant === 4 && (
-          <HomeVariantFour
-            copy={copy}
-            language={language}
-            selectedCountryName={selectedCountryName}
-            hotCountryName={hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
-            isLoading={isLoading}
-            mixedHotGlobal={mixedHotGlobal}
-            hotLocal={hotLocal}
-            platformTrends={displayPlatformTrends}
-            platformLimits={platformLimits}
-            onShowMore={handleShowMore}
-            sourceBreakdown={sourceBreakdown}
-            watchlist={watchlist}
-            lastUpdatedLabel={lastUpdatedLabel}
-          />
-        )}
+        <HomeVariantOne
+          copy={copy}
+          language={language}
+          selectedCountryName={selectedCountryName}
+          hotCountryName={hotCountryCode === 'GLOBAL' ? 'Italy' : getCountryName(hotCountryCode)}
+          isLoading={isLoading}
+          mixedHotGlobal={mixedHotGlobal}
+          hotLocal={hotLocal}
+          platformTrends={displayPlatformTrends}
+          platformLimits={platformLimits}
+          onShowMore={handleShowMore}
+          sourceBreakdown={sourceBreakdown}
+          watchlist={watchlist}
+          lastUpdatedLabel={lastUpdatedLabel}
+        />
 
         <div className="text-center text-xs text-[#9ca3af] py-6 border-t border-[#e5e7eb]">
           Terms · Privacy · API Docs · About · Contact

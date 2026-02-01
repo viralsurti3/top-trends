@@ -13,3 +13,54 @@ jobs:
         run: |
           curl -fsSL "${{ secrets.CRON_URL }}?concurrency=6"
 
+  hit-youtube-trends:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh YouTube trends by region
+        run: |
+          regions=(
+            GLOBAL
+            US
+            GB
+            CA
+            AU
+            DE
+            FR
+            IT
+            ES
+            NL
+            BE
+            CH
+            AT
+            SE
+            NO
+            DK
+            FI
+            PL
+            PT
+            GR
+            IE
+            IN
+            JP
+            KR
+            BR
+            MX
+            AR
+            CL
+            ZA
+            NZ
+            SG
+            MY
+            TH
+            PH
+            ID
+            TR
+            SA
+            AE
+            EG
+          )
+          for region in "${regions[@]}"; do
+            echo "Refreshing YouTube trends for ${region}"
+            curl -fsSL "${{ secrets.YOUTUBE_CRON_URL }}?refresh=1&region=${region}"
+          done
+
